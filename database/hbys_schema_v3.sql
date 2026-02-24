@@ -2,12 +2,12 @@
 -- PostgreSQL database dump
 --
 
-\restrict lULR67rXzVMRqknXCA8cdFi5UvcuFskTLgm7QMEkWwb5v1dmTuDN4TjgA7vdxMn
+\restrict OZzgmSLgsoLvWT1Z0X13CJLQA02OFd4M8zfZgzsSViVctfhzrYA4e0DaIabEeAl
 
 -- Dumped from database version 16.12
 -- Dumped by pg_dump version 16.12
 
--- Started on 2026-02-24 10:45:06
+-- Started on 2026-02-24 11:45:12
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -770,6 +770,7 @@ COPY public.hastalar (id, tc_no, ad_soyad, dogum_tarihi, cinsiyet, kan_grubu, te
 
 COPY public.kullanicilar (id, tc_no, sifre, rol) FROM stdin;
 82	88888888888	$2a$10$JkAGsBcRhSrmP4WqhcOE5u1VnRMfJSs/ULglw8IjoLpqZenZTPN7C	HASTA
+86	12345678909	$2a$10$ycXFt/EBsEMMp9SVWWLjC.iz.PeEFb5Wprtk.57WjjXmRRRKiNj6K	HASTA
 41	12345678901	$2a$06$JRVIFs36t9P9K91nva1nJ.J5qMwk80zVzfASDpcWz3Cp90MGMeGni	HASTA
 42	12345678902	$2a$06$GJqS5H6PEWGtNEOcKErX9OLnyVqvadslDF98lkK0iuT1nlsi2GZom	HASTA
 43	98765432109	$2a$06$4ppundUSQ49Ytmr815GCge36JgHsGDfgFsEFe4usf0uhnF.kt8qQW	HASTA
@@ -803,7 +804,6 @@ COPY public.kullanicilar (id, tc_no, sifre, rol) FROM stdin;
 70	20000000013	$2a$06$pyQqyOjZp13nmQp0tVIC.uvaXLzNFVAcKXTxwO7gCaQMX2RiAwg46	PERSONEL
 71	20000000014	$2a$06$/6BN62dk0w3yXyz8iCk.xO7Nparand4y.zmYMiitNZuiWAv1EzaH.	PERSONEL
 72	20000000015	$2a$06$j1puyg6T447hhn2rM0AOh.pD3pO9dKjYSiY.62kkwTKOOvFaVzyfK	PERSONEL
-81	12345678909	$2a$06$eWzxG3ZpJmscFn4sGrx07eCNdYHdzqGaWvv7ifiGStdXxZmDQR8zq	HASTA
 78	11111111111	$2a$06$ZNLfYpwvHh3vxgALdJzxre87VMW5thEtRtU/.onR3VqEQ7x1pJBhi	PERSONEL
 80	11122233344	$2a$06$5I3c8A9Nw4vc8TGO9bMC9eHwEqYFARe5UCxqvHE1SIkuriPSli9q6	HASTA
 1	10000000001	$2a$06$xLtsjl7wIO7v7fJ1uCD7ZuejOgIFex8mCf85aw9vTrcrr8P1PjUIK	DOKTOR
@@ -847,6 +847,7 @@ COPY public.kullanicilar (id, tc_no, sifre, rol) FROM stdin;
 39	10000000039	$2a$06$1cRzUAEi7B8IcRpw66sULOngO0bAc7UlGIsEub1t93Df1Dg6bZPx2	DOKTOR
 40	10000000040	$2a$06$D39bQyJE9/u5SVkhgnMPl.0T3t9J7zJI2wAsZ1uYkBQzJMOc9D9IW	DOKTOR
 85	33333333333	$2a$06$6uvbOWnT7o7XlFjtaR5VJudIcVeNG8GUpOvPpmNZe.M90rusbCpue	BASHEKIM
+87	00000000000	admin_ozel_sifre	ADMIN
 \.
 
 
@@ -1006,7 +1007,7 @@ SELECT pg_catalog.setval('public.hastalar_id_seq', 21, true);
 -- Name: kullanicilar_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.kullanicilar_id_seq', 85, true);
+SELECT pg_catalog.setval('public.kullanicilar_id_seq', 87, true);
 
 
 --
@@ -1368,11 +1369,11 @@ ALTER TABLE ONLY public.yatislar
     ADD CONSTRAINT yatislar_sorumlu_hemsire_id_fkey FOREIGN KEY (personel_id) REFERENCES public.personeller(id);
 
 
--- Completed on 2026-02-24 10:45:06
+-- Completed on 2026-02-24 11:45:12
 
 --
 -- PostgreSQL database dump complete
 --
 
-\unrestrict lULR67rXzVMRqknXCA8cdFi5UvcuFskTLgm7QMEkWwb5v1dmTuDN4TjgA7vdxMn
+\unrestrict OZzgmSLgsoLvWT1Z0X13CJLQA02OFd4M8zfZgzsSViVctfhzrYA4e0DaIabEeAl
 
