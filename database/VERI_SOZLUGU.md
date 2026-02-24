@@ -132,7 +132,7 @@ Sisteme giriş yapan kullanıcı hesaplarını tutar.
 
 
 
-6\. Tablo: yataklar
+6\. Tablo: yatislar
 
 
 
@@ -152,7 +152,7 @@ Sisteme giriş yapan kullanıcı hesaplarını tutar.
 
 | taburcu\_tarihi     | TIMESTAMP   | -                             | Çıkış tarihi    |
 
-| sorumlu\_hemsire\_id | INTEGER     | FOREIGN KEY → personeller(id) | Sorumlu hemşire |
+| personel\_id | INTEGER     | FOREIGN KEY → personeller(id) | Sorumlu hemşire |
 
 
 
@@ -202,9 +202,11 @@ Sisteme giriş yapan kullanıcı hesaplarını tutar.
 
 | mesaj        | TEXT        | -                          | İçerik         |
 
-| sonuc\_durumu | VARCHAR(20) | -                          | Açık / Kapalı  |
+| oncelik\_durumu | VARCHAR(20) | -                       |Öncelik sırası |
 
 | tarih        | DATE        | -                          | Tarih          |
+
+| bashekim_cevabi        | TEXT        | -                | Yanıt      |
 
 
 
