@@ -2,12 +2,12 @@
 -- PostgreSQL database dump
 --
 
-\restrict OZzgmSLgsoLvWT1Z0X13CJLQA02OFd4M8zfZgzsSViVctfhzrYA4e0DaIabEeAl
+\restrict KXFxEg0SBbQyrtTd9TvJ2QvWl9I57hnyHyApiqI3dH4zspiVBsFHEfIq9XFaLbF
 
 -- Dumped from database version 16.12
 -- Dumped by pg_dump version 16.12
 
--- Started on 2026-02-24 11:45:12
+-- Started on 2026-02-25 14:54:23
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -29,7 +29,7 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA public;
 
 
 --
--- TOC entry 5086 (class 0 OID 0)
+-- TOC entry 5081 (class 0 OID 0)
 -- Dependencies: 2
 -- Name: EXTENSION pgcrypto; Type: COMMENT; Schema: -; Owner: 
 --
@@ -38,7 +38,7 @@ COMMENT ON EXTENSION pgcrypto IS 'cryptographic functions';
 
 
 --
--- TOC entry 243 (class 1255 OID 16895)
+-- TOC entry 242 (class 1255 OID 16895)
 -- Name: fn_randevu_tamamla(); Type: FUNCTION; Schema: public; Owner: postgres
 --
 
@@ -96,7 +96,7 @@ CREATE SEQUENCE public.doktorlar_id_seq
 ALTER SEQUENCE public.doktorlar_id_seq OWNER TO postgres;
 
 --
--- TOC entry 5087 (class 0 OID 0)
+-- TOC entry 5082 (class 0 OID 0)
 -- Dependencies: 220
 -- Name: doktorlar_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
 --
@@ -114,14 +114,14 @@ CREATE TABLE public.hastalar (
     tc_no character varying(11) NOT NULL,
     ad_soyad character varying(255) NOT NULL,
     dogum_tarihi date,
-    cinsiyet character(1),
-    kan_grubu character varying(255),
-    telefon character varying(255),
+    cinsiyet character varying(10),
+    kan_grubu character varying(10),
+    telefon character varying(11),
     adres character varying(255),
     kullanici_id integer,
-    CONSTRAINT check_cinsiyet CHECK ((cinsiyet = ANY (ARRAY['E'::bpchar, 'K'::bpchar]))),
+    CONSTRAINT check_cinsiyet CHECK (((cinsiyet)::text = ANY ((ARRAY['ERKEK'::character varying, 'KADIN'::character varying, 'E'::character varying, 'K'::character varying])::text[]))),
     CONSTRAINT check_dogum_tarihi CHECK ((dogum_tarihi <= CURRENT_DATE)),
-    CONSTRAINT check_kan_grubu CHECK (((kan_grubu)::text = ANY ((ARRAY['A Rh+'::character varying, 'A Rh-'::character varying, 'B Rh+'::character varying, 'B Rh-'::character varying, 'AB Rh+'::character varying, 'AB Rh-'::character varying, '0 Rh+'::character varying, '0 Rh-'::character varying])::text[]))),
+    CONSTRAINT check_kan_grubu CHECK (((kan_grubu)::text = ANY ((ARRAY['A+'::character varying, 'A-'::character varying, 'B+'::character varying, 'B-'::character varying, 'AB+'::character varying, 'AB-'::character varying, '0+'::character varying, '0-'::character varying, 'A Rh+'::character varying, 'A Rh-'::character varying, 'B Rh+'::character varying, 'B Rh-'::character varying, 'AB Rh+'::character varying, 'AB Rh-'::character varying, '0 Rh+'::character varying, '0 Rh-'::character varying])::text[]))),
     CONSTRAINT check_phone_length CHECK (((length((telefon)::text) >= 10) AND (length((telefon)::text) <= 11)))
 );
 
@@ -145,7 +145,7 @@ CREATE SEQUENCE public.hastalar_id_seq
 ALTER SEQUENCE public.hastalar_id_seq OWNER TO postgres;
 
 --
--- TOC entry 5088 (class 0 OID 0)
+-- TOC entry 5083 (class 0 OID 0)
 -- Dependencies: 222
 -- Name: hastalar_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
 --
@@ -186,7 +186,7 @@ CREATE SEQUENCE public.kullanicilar_id_seq
 ALTER SEQUENCE public.kullanicilar_id_seq OWNER TO postgres;
 
 --
--- TOC entry 5089 (class 0 OID 0)
+-- TOC entry 5084 (class 0 OID 0)
 -- Dependencies: 234
 -- Name: kullanicilar_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
 --
@@ -228,7 +228,7 @@ CREATE SEQUENCE public.otopark_kayitlari_id_seq
 ALTER SEQUENCE public.otopark_kayitlari_id_seq OWNER TO postgres;
 
 --
--- TOC entry 5090 (class 0 OID 0)
+-- TOC entry 5085 (class 0 OID 0)
 -- Dependencies: 230
 -- Name: otopark_kayitlari_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
 --
@@ -272,7 +272,7 @@ CREATE SEQUENCE public.personeller_id_seq
 ALTER SEQUENCE public.personeller_id_seq OWNER TO postgres;
 
 --
--- TOC entry 5091 (class 0 OID 0)
+-- TOC entry 5086 (class 0 OID 0)
 -- Dependencies: 218
 -- Name: personeller_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
 --
@@ -312,7 +312,7 @@ CREATE SEQUENCE public.poliklinikler_id_seq
 ALTER SEQUENCE public.poliklinikler_id_seq OWNER TO postgres;
 
 --
--- TOC entry 5092 (class 0 OID 0)
+-- TOC entry 5087 (class 0 OID 0)
 -- Dependencies: 216
 -- Name: poliklinikler_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
 --
@@ -356,7 +356,7 @@ CREATE SEQUENCE public.randevular_id_seq
 ALTER SEQUENCE public.randevular_id_seq OWNER TO postgres;
 
 --
--- TOC entry 5093 (class 0 OID 0)
+-- TOC entry 5088 (class 0 OID 0)
 -- Dependencies: 224
 -- Name: randevular_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
 --
@@ -399,34 +399,13 @@ CREATE SEQUENCE public.sikayet_oneri_id_seq
 ALTER SEQUENCE public.sikayet_oneri_id_seq OWNER TO postgres;
 
 --
--- TOC entry 5094 (class 0 OID 0)
+-- TOC entry 5089 (class 0 OID 0)
 -- Dependencies: 232
 -- Name: sikayet_oneri_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
 --
 
 ALTER SEQUENCE public.sikayet_oneri_id_seq OWNED BY public.sikayet_oneri.id;
 
-
---
--- TOC entry 236 (class 1259 OID 16865)
--- Name: sirali_hastalar; Type: VIEW; Schema: public; Owner: postgres
---
-
-CREATE VIEW public.sirali_hastalar AS
- SELECT id,
-    tc_no,
-    ad_soyad,
-    dogum_tarihi,
-    cinsiyet,
-    kan_grubu,
-    telefon,
-    adres,
-    kullanici_id
-   FROM public.hastalar
-  ORDER BY id;
-
-
-ALTER VIEW public.sirali_hastalar OWNER TO postgres;
 
 --
 -- TOC entry 227 (class 1259 OID 16696)
@@ -464,7 +443,7 @@ CREATE SEQUENCE public.tahliller_id_seq
 ALTER SEQUENCE public.tahliller_id_seq OWNER TO postgres;
 
 --
--- TOC entry 5095 (class 0 OID 0)
+-- TOC entry 5090 (class 0 OID 0)
 -- Dependencies: 226
 -- Name: tahliller_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
 --
@@ -473,7 +452,7 @@ ALTER SEQUENCE public.tahliller_id_seq OWNED BY public.tahliller.id;
 
 
 --
--- TOC entry 239 (class 1259 OID 16888)
+-- TOC entry 238 (class 1259 OID 16888)
 -- Name: v_randevu_detaylari; Type: VIEW; Schema: public; Owner: postgres
 --
 
@@ -496,7 +475,7 @@ CREATE VIEW public.v_randevu_detaylari AS
 ALTER VIEW public.v_randevu_detaylari OWNER TO postgres;
 
 --
--- TOC entry 238 (class 1259 OID 16879)
+-- TOC entry 237 (class 1259 OID 16879)
 -- Name: v_tahlil_istatistik; Type: VIEW; Schema: public; Owner: postgres
 --
 
@@ -513,7 +492,7 @@ CREATE VIEW public.v_tahlil_istatistik AS
 ALTER VIEW public.v_tahlil_istatistik OWNER TO postgres;
 
 --
--- TOC entry 237 (class 1259 OID 16875)
+-- TOC entry 236 (class 1259 OID 16875)
 -- Name: v_tahlil_ozet; Type: VIEW; Schema: public; Owner: postgres
 --
 
@@ -528,7 +507,7 @@ CREATE VIEW public.v_tahlil_ozet AS
 ALTER VIEW public.v_tahlil_ozet OWNER TO postgres;
 
 --
--- TOC entry 240 (class 1259 OID 16921)
+-- TOC entry 239 (class 1259 OID 16921)
 -- Name: view_doktor_detaylari; Type: VIEW; Schema: public; Owner: postgres
 --
 
@@ -546,7 +525,7 @@ CREATE VIEW public.view_doktor_detaylari AS
 ALTER VIEW public.view_doktor_detaylari OWNER TO postgres;
 
 --
--- TOC entry 241 (class 1259 OID 16925)
+-- TOC entry 240 (class 1259 OID 16925)
 -- Name: view_doktor_randevu_istatistik; Type: VIEW; Schema: public; Owner: postgres
 --
 
@@ -595,7 +574,7 @@ CREATE SEQUENCE public.yatislar_id_seq
 ALTER SEQUENCE public.yatislar_id_seq OWNER TO postgres;
 
 --
--- TOC entry 5096 (class 0 OID 0)
+-- TOC entry 5091 (class 0 OID 0)
 -- Dependencies: 228
 -- Name: yatislar_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
 --
@@ -604,7 +583,7 @@ ALTER SEQUENCE public.yatislar_id_seq OWNED BY public.yatislar.id;
 
 
 --
--- TOC entry 4845 (class 2604 OID 16656)
+-- TOC entry 4841 (class 2604 OID 16656)
 -- Name: doktorlar id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
@@ -612,7 +591,7 @@ ALTER TABLE ONLY public.doktorlar ALTER COLUMN id SET DEFAULT nextval('public.do
 
 
 --
--- TOC entry 4846 (class 2604 OID 16668)
+-- TOC entry 4842 (class 2604 OID 16668)
 -- Name: hastalar id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
@@ -620,7 +599,7 @@ ALTER TABLE ONLY public.hastalar ALTER COLUMN id SET DEFAULT nextval('public.has
 
 
 --
--- TOC entry 4857 (class 2604 OID 16845)
+-- TOC entry 4853 (class 2604 OID 16845)
 -- Name: kullanicilar id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
@@ -628,7 +607,7 @@ ALTER TABLE ONLY public.kullanicilar ALTER COLUMN id SET DEFAULT nextval('public
 
 
 --
--- TOC entry 4853 (class 2604 OID 16735)
+-- TOC entry 4849 (class 2604 OID 16735)
 -- Name: otopark_kayitlari id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
@@ -636,7 +615,7 @@ ALTER TABLE ONLY public.otopark_kayitlari ALTER COLUMN id SET DEFAULT nextval('p
 
 
 --
--- TOC entry 4843 (class 2604 OID 16641)
+-- TOC entry 4839 (class 2604 OID 16641)
 -- Name: personeller id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
@@ -644,7 +623,7 @@ ALTER TABLE ONLY public.personeller ALTER COLUMN id SET DEFAULT nextval('public.
 
 
 --
--- TOC entry 4842 (class 2604 OID 16632)
+-- TOC entry 4838 (class 2604 OID 16632)
 -- Name: poliklinikler id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
@@ -652,7 +631,7 @@ ALTER TABLE ONLY public.poliklinikler ALTER COLUMN id SET DEFAULT nextval('publi
 
 
 --
--- TOC entry 4847 (class 2604 OID 16679)
+-- TOC entry 4843 (class 2604 OID 16679)
 -- Name: randevular id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
@@ -660,7 +639,7 @@ ALTER TABLE ONLY public.randevular ALTER COLUMN id SET DEFAULT nextval('public.r
 
 
 --
--- TOC entry 4855 (class 2604 OID 16748)
+-- TOC entry 4851 (class 2604 OID 16748)
 -- Name: sikayet_oneri id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
@@ -668,7 +647,7 @@ ALTER TABLE ONLY public.sikayet_oneri ALTER COLUMN id SET DEFAULT nextval('publi
 
 
 --
--- TOC entry 4849 (class 2604 OID 16699)
+-- TOC entry 4845 (class 2604 OID 16699)
 -- Name: tahliller id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
@@ -676,7 +655,7 @@ ALTER TABLE ONLY public.tahliller ALTER COLUMN id SET DEFAULT nextval('public.ta
 
 
 --
--- TOC entry 4851 (class 2604 OID 16717)
+-- TOC entry 4847 (class 2604 OID 16717)
 -- Name: yatislar id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
@@ -684,7 +663,7 @@ ALTER TABLE ONLY public.yatislar ALTER COLUMN id SET DEFAULT nextval('public.yat
 
 
 --
--- TOC entry 5066 (class 0 OID 16653)
+-- TOC entry 5061 (class 0 OID 16653)
 -- Dependencies: 221
 -- Data for Name: doktorlar; Type: TABLE DATA; Schema: public; Owner: postgres
 --
@@ -735,7 +714,7 @@ COPY public.doktorlar (id, ad_soyad, uzmanlik_alani, poliklinik_id, unvan, tc_no
 
 
 --
--- TOC entry 5068 (class 0 OID 16665)
+-- TOC entry 5063 (class 0 OID 16665)
 -- Dependencies: 223
 -- Data for Name: hastalar; Type: TABLE DATA; Schema: public; Owner: postgres
 --
@@ -759,11 +738,14 @@ COPY public.hastalar (id, tc_no, ad_soyad, dogum_tarihi, cinsiyet, kan_grubu, te
 17	30000000009	Ece Fırtına	1998-09-12	K	A Rh+	05315556677	Trabzon, Ortahisar	56
 18	30000000010	Burak Deniz	1982-01-22	E	0 Rh-	05412228899	Gaziantep, Şahinbey	57
 21	11122233344	Ahmet Yılmaz	1990-05-15	E	A Rh+	05551112233	Ankara/Çankaya	80
+25	00000000004	ayşe gündüz	2004-06-10	K	B+	05569899778	Ankara Yenimahalle	107
+26	00000000036	ayşe gündüz	2004-06-10	K	B+	05569899778	Ankara Yenimahalle	108
+27	15715715715	Meryem Kul	2006-03-12	K	AB-	05556544589	Ankara, Altındağ	109
 \.
 
 
 --
--- TOC entry 5080 (class 0 OID 16842)
+-- TOC entry 5075 (class 0 OID 16842)
 -- Dependencies: 235
 -- Data for Name: kullanicilar; Type: TABLE DATA; Schema: public; Owner: postgres
 --
@@ -771,6 +753,15 @@ COPY public.hastalar (id, tc_no, ad_soyad, dogum_tarihi, cinsiyet, kan_grubu, te
 COPY public.kullanicilar (id, tc_no, sifre, rol) FROM stdin;
 82	88888888888	$2a$10$JkAGsBcRhSrmP4WqhcOE5u1VnRMfJSs/ULglw8IjoLpqZenZTPN7C	HASTA
 86	12345678909	$2a$10$ycXFt/EBsEMMp9SVWWLjC.iz.PeEFb5Wprtk.57WjjXmRRRKiNj6K	HASTA
+90	36363636363	$2a$10$34Rdro/LDAf5hwWIDow1f.S9C5R2M3FUnRwfWFcLRgXwD.5eSiiTK	HASTA
+91	78787878787	$2a$10$IjodaLcU82ITX8X9zduW7e7Y/SrlJTvFAzorTeY.3dtY1XmUECSGO	HASTA
+100	19191919191	$2a$10$CpS02Ulcdj97BlBFdSmvZOvI8Ue95533NjDSlpZiWBLZnDWDRPfBa	HASTA
+101	28282828282	$2a$10$rq2se0E913RRMjKgm8hxketb9jsg4Hqad6k9YbZ1HfZxwgVoBvsCe	HASTA
+102	28282828288	$2a$10$BlVztD2WVsSAL.xe9G5szeiy.m/0gCJvoHd3o/FzS6bbt3x7tOpCu	HASTA
+103	18181818181	$2a$10$pGjZMWuMI7EJqTE5YHkQ8ORVUydE0d3F2SC17z6TZdhWttmPpYWe6	HASTA
+104	00000000001	$2a$10$Fr4iPe3G1csMFyJxVDf0TuilUeXjhUwbaj3dBZ0V1kRIb0VNKBm8e	HASTA
+105	00000000005	$2a$10$FIt9Lqai/HajYq4UY/N9V.8GMEeyqYhGvIvBRy9wSRAVpou8YOwSG	HASTA
+106	00000000007	$2a$10$a/d9R3cAdgt4mhb74W77HOwsUPL2qPPDp/2XdwVEqDtKCEuM.t9VG	HASTA
 41	12345678901	$2a$06$JRVIFs36t9P9K91nva1nJ.J5qMwk80zVzfASDpcWz3Cp90MGMeGni	HASTA
 42	12345678902	$2a$06$GJqS5H6PEWGtNEOcKErX9OLnyVqvadslDF98lkK0iuT1nlsi2GZom	HASTA
 43	98765432109	$2a$06$4ppundUSQ49Ytmr815GCge36JgHsGDfgFsEFe4usf0uhnF.kt8qQW	HASTA
@@ -801,6 +792,14 @@ COPY public.kullanicilar (id, tc_no, sifre, rol) FROM stdin;
 68	20000000011	$2a$06$26TlU/YTAsZSwjsagED/y.t5BYKhFxcYXb7O6h7sGi7yNOEAJE0ie	PERSONEL
 69	20000000012	$2a$06$UMBGqVQXnazVVSzPtr2Si.VJ0i4gvc2RjWDfBB6e.K2mitVkIt8jy	PERSONEL
 83	99999999999	$2a$10$xMaSg5Qr5PtynkxGklP4U.S/gaNBOKbQnga4TOSiF1C2CbPbzWOA.	HASTA
+88	55555555555	sifre123	HASTA
+92	37373737373	$2a$10$yEAR//PPWzfUec4lMflyYOswyG7Z5stxeoLtE9HYuDI0rRIYxk8sa	HASTA
+93	37373737377	$2a$10$YjTEeaYDo4w0daZiLhZ/9uzxUdZyBWFHjZan9pmxtAjoOE2sZ4qyC	HASTA
+94	79797979797	$2a$10$UUVeBZaKKAsPRDcJYt7Ofe11cRTd95z.jDVOPZgo1/78pGaRdewZ.	HASTA
+95	79797979799	$2a$10$4l.hmMNK2OCTIDZP7zy2X.gJStQCpguIfTqp23a/M74gGmOxdu3m6	HASTA
+96	97979797979	$2a$10$QGB5JEreEGo4188AXn.Da.OQz6PZxVu5eXq91Nq9FM09SFPYziU6q	HASTA
+107	00000000004	$2a$10$zW9qMzuThMNtqUTIS3nAwuYdxC/gWLmdEJFF4wxny3c9PaM/nBW6K	HASTA
+108	00000000036	$2a$10$bwsZR5xey739LDbG6r9yG.S/HTRzf8W12g33XhlhI6O38QR.GhG.6	HASTA
 70	20000000013	$2a$06$pyQqyOjZp13nmQp0tVIC.uvaXLzNFVAcKXTxwO7gCaQMX2RiAwg46	PERSONEL
 71	20000000014	$2a$06$/6BN62dk0w3yXyz8iCk.xO7Nparand4y.zmYMiitNZuiWAv1EzaH.	PERSONEL
 72	20000000015	$2a$06$j1puyg6T447hhn2rM0AOh.pD3pO9dKjYSiY.62kkwTKOOvFaVzyfK	PERSONEL
@@ -848,11 +847,16 @@ COPY public.kullanicilar (id, tc_no, sifre, rol) FROM stdin;
 40	10000000040	$2a$06$D39bQyJE9/u5SVkhgnMPl.0T3t9J7zJI2wAsZ1uYkBQzJMOc9D9IW	DOKTOR
 85	33333333333	$2a$06$6uvbOWnT7o7XlFjtaR5VJudIcVeNG8GUpOvPpmNZe.M90rusbCpue	BASHEKIM
 87	00000000000	admin_ozel_sifre	ADMIN
+89	55555555554	$2a$10$XOKiHJZxRcFYm3uQH07FUuFrbDtc8coUeqRGHWVwswJuodgY..sJe	HASTA
+97	87878787878	$2a$10$NE2a.DCtTcymM3m0Sa.Dxe3Xb8TQI4ipbdug5D3CRqDMeNKx4RHYC	HASTA
+98	67676767676	$2a$10$iyN9/HvOxSv/kHQVKnKRjeku8YYrzktQLqW857/CzzdEtrMGd8iVO	HASTA
+99	12121212121	$2a$10$vHnOORGydPR1cJ9FSdSyseNhorLBncTIBVX1I7JMHf1YF/1CeaFMK	HASTA
+109	15715715715	$2a$10$jcMEmdFJba9Ga3q9Tm.rzuyZcxwf7i70GgDJvzYhx/GrI5PLeCORu	HASTA
 \.
 
 
 --
--- TOC entry 5076 (class 0 OID 16732)
+-- TOC entry 5071 (class 0 OID 16732)
 -- Dependencies: 231
 -- Data for Name: otopark_kayitlari; Type: TABLE DATA; Schema: public; Owner: postgres
 --
@@ -867,7 +871,7 @@ COPY public.otopark_kayitlari (id, plaka, arac_tipi, giris_saati, cikis_saati, h
 
 
 --
--- TOC entry 5064 (class 0 OID 16638)
+-- TOC entry 5059 (class 0 OID 16638)
 -- Dependencies: 219
 -- Data for Name: personeller; Type: TABLE DATA; Schema: public; Owner: postgres
 --
@@ -892,7 +896,7 @@ COPY public.personeller (id, tc_no, ad_soyad, telefon, rol, birim_id, ise_giris_
 
 
 --
--- TOC entry 5062 (class 0 OID 16629)
+-- TOC entry 5057 (class 0 OID 16629)
 -- Dependencies: 217
 -- Data for Name: poliklinikler; Type: TABLE DATA; Schema: public; Owner: postgres
 --
@@ -922,13 +926,12 @@ COPY public.poliklinikler (id, ad, kat_bilgisi, aciklama) FROM stdin;
 
 
 --
--- TOC entry 5070 (class 0 OID 16676)
+-- TOC entry 5065 (class 0 OID 16676)
 -- Dependencies: 225
 -- Data for Name: randevular; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
 COPY public.randevular (id, hasta_id, doktor_id, durum, sikayet, randevu_tarihi, randevu_saati) FROM stdin;
-41	1	3	BEKLEMEDE	\N	2026-02-20	\N
 29	9	27	BEKLEMEDE	Uyku bozukluğu	2026-02-22	16:00:00
 21	1	3	BEKLEMEDE	Mide bulantısı ve yanma	2026-02-19	09:00:00
 22	2	5	BEKLEMEDE	Gözlerde kızarıklık ve kaşıntı	2026-02-19	10:30:00
@@ -944,7 +947,7 @@ COPY public.randevular (id, hasta_id, doktor_id, durum, sikayet, randevu_tarihi,
 
 
 --
--- TOC entry 5078 (class 0 OID 16745)
+-- TOC entry 5073 (class 0 OID 16745)
 -- Dependencies: 233
 -- Data for Name: sikayet_oneri; Type: TABLE DATA; Schema: public; Owner: postgres
 --
@@ -955,7 +958,7 @@ COPY public.sikayet_oneri (id, hasta_id, kategori, mesaj, oncelik_durumu, tarih,
 
 
 --
--- TOC entry 5072 (class 0 OID 16696)
+-- TOC entry 5067 (class 0 OID 16696)
 -- Dependencies: 227
 -- Data for Name: tahliller; Type: TABLE DATA; Schema: public; Owner: postgres
 --
@@ -969,11 +972,15 @@ COPY public.tahliller (id, hasta_id, doktor_id, tahlil_adi, sonuc_degeri, refera
 7	4	15	Demir (Serum)	35	50 - 170 ug/dL	2026-02-18 00:00:00	\N
 8	1	3	Kolesterol	210	120 - 200 mg/dL	2026-02-18 00:00:00	\N
 9	7	25	B12 Vitamini	250	200-900	2026-02-19 00:00:00	27
+13	1	42	Tam Kan Sayımı	\N	4.5 - 11.0 K/uL	2026-02-25 09:42:12.835578	\N
+14	1	42	Tam Kan Sayımı	\N	4.5 - 11.0 K/uL	2026-02-25 09:42:51.171841	\N
+15	1	42	Tam Kan Sayımı	\N	4.5 - 11.0 K/uL	2026-02-25 09:42:51.651602	\N
+16	1	42	Tam Kan Sayımı	\N	4.5 - 11.0 K/uL	2026-02-25 09:42:51.849999	\N
 \.
 
 
 --
--- TOC entry 5074 (class 0 OID 16714)
+-- TOC entry 5069 (class 0 OID 16714)
 -- Dependencies: 229
 -- Data for Name: yatislar; Type: TABLE DATA; Schema: public; Owner: postgres
 --
@@ -984,7 +991,7 @@ COPY public.yatislar (id, hasta_id, oda_no, yatak_no, yatis_tarihi, taburcu_tari
 
 
 --
--- TOC entry 5097 (class 0 OID 0)
+-- TOC entry 5092 (class 0 OID 0)
 -- Dependencies: 220
 -- Name: doktorlar_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
@@ -993,25 +1000,25 @@ SELECT pg_catalog.setval('public.doktorlar_id_seq', 42, true);
 
 
 --
--- TOC entry 5098 (class 0 OID 0)
+-- TOC entry 5093 (class 0 OID 0)
 -- Dependencies: 222
 -- Name: hastalar_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.hastalar_id_seq', 21, true);
+SELECT pg_catalog.setval('public.hastalar_id_seq', 27, true);
 
 
 --
--- TOC entry 5099 (class 0 OID 0)
+-- TOC entry 5094 (class 0 OID 0)
 -- Dependencies: 234
 -- Name: kullanicilar_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.kullanicilar_id_seq', 87, true);
+SELECT pg_catalog.setval('public.kullanicilar_id_seq', 109, true);
 
 
 --
--- TOC entry 5100 (class 0 OID 0)
+-- TOC entry 5095 (class 0 OID 0)
 -- Dependencies: 230
 -- Name: otopark_kayitlari_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
@@ -1020,7 +1027,7 @@ SELECT pg_catalog.setval('public.otopark_kayitlari_id_seq', 5, true);
 
 
 --
--- TOC entry 5101 (class 0 OID 0)
+-- TOC entry 5096 (class 0 OID 0)
 -- Dependencies: 218
 -- Name: personeller_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
@@ -1029,7 +1036,7 @@ SELECT pg_catalog.setval('public.personeller_id_seq', 15, true);
 
 
 --
--- TOC entry 5102 (class 0 OID 0)
+-- TOC entry 5097 (class 0 OID 0)
 -- Dependencies: 216
 -- Name: poliklinikler_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
@@ -1038,7 +1045,7 @@ SELECT pg_catalog.setval('public.poliklinikler_id_seq', 20, true);
 
 
 --
--- TOC entry 5103 (class 0 OID 0)
+-- TOC entry 5098 (class 0 OID 0)
 -- Dependencies: 224
 -- Name: randevular_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
@@ -1047,7 +1054,7 @@ SELECT pg_catalog.setval('public.randevular_id_seq', 41, true);
 
 
 --
--- TOC entry 5104 (class 0 OID 0)
+-- TOC entry 5099 (class 0 OID 0)
 -- Dependencies: 232
 -- Name: sikayet_oneri_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
@@ -1056,16 +1063,16 @@ SELECT pg_catalog.setval('public.sikayet_oneri_id_seq', 1, true);
 
 
 --
--- TOC entry 5105 (class 0 OID 0)
+-- TOC entry 5100 (class 0 OID 0)
 -- Dependencies: 226
 -- Name: tahliller_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.tahliller_id_seq', 12, true);
+SELECT pg_catalog.setval('public.tahliller_id_seq', 16, true);
 
 
 --
--- TOC entry 5106 (class 0 OID 0)
+-- TOC entry 5101 (class 0 OID 0)
 -- Dependencies: 228
 -- Name: yatislar_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
@@ -1074,7 +1081,7 @@ SELECT pg_catalog.setval('public.yatislar_id_seq', 1, true);
 
 
 --
--- TOC entry 4871 (class 2606 OID 16658)
+-- TOC entry 4867 (class 2606 OID 16658)
 -- Name: doktorlar doktorlar_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -1083,7 +1090,7 @@ ALTER TABLE ONLY public.doktorlar
 
 
 --
--- TOC entry 4873 (class 2606 OID 16672)
+-- TOC entry 4869 (class 2606 OID 16672)
 -- Name: hastalar hastalar_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -1092,7 +1099,7 @@ ALTER TABLE ONLY public.hastalar
 
 
 --
--- TOC entry 4875 (class 2606 OID 16769)
+-- TOC entry 4871 (class 2606 OID 16769)
 -- Name: hastalar hastalar_tc_no_key; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -1101,7 +1108,7 @@ ALTER TABLE ONLY public.hastalar
 
 
 --
--- TOC entry 4891 (class 2606 OID 16847)
+-- TOC entry 4887 (class 2606 OID 16847)
 -- Name: kullanicilar kullanicilar_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -1110,7 +1117,7 @@ ALTER TABLE ONLY public.kullanicilar
 
 
 --
--- TOC entry 4893 (class 2606 OID 16849)
+-- TOC entry 4889 (class 2606 OID 16849)
 -- Name: kullanicilar kullanicilar_tc_no_key; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -1119,7 +1126,7 @@ ALTER TABLE ONLY public.kullanicilar
 
 
 --
--- TOC entry 4887 (class 2606 OID 16738)
+-- TOC entry 4883 (class 2606 OID 16738)
 -- Name: otopark_kayitlari otopark_kayitlari_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -1128,7 +1135,7 @@ ALTER TABLE ONLY public.otopark_kayitlari
 
 
 --
--- TOC entry 4867 (class 2606 OID 16644)
+-- TOC entry 4863 (class 2606 OID 16644)
 -- Name: personeller personeller_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -1137,7 +1144,7 @@ ALTER TABLE ONLY public.personeller
 
 
 --
--- TOC entry 4869 (class 2606 OID 16646)
+-- TOC entry 4865 (class 2606 OID 16646)
 -- Name: personeller personeller_tc_no_key; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -1146,7 +1153,7 @@ ALTER TABLE ONLY public.personeller
 
 
 --
--- TOC entry 4865 (class 2606 OID 16636)
+-- TOC entry 4861 (class 2606 OID 16636)
 -- Name: poliklinikler poliklinikler_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -1155,7 +1162,7 @@ ALTER TABLE ONLY public.poliklinikler
 
 
 --
--- TOC entry 4877 (class 2606 OID 16684)
+-- TOC entry 4873 (class 2606 OID 16684)
 -- Name: randevular randevular_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -1164,7 +1171,7 @@ ALTER TABLE ONLY public.randevular
 
 
 --
--- TOC entry 4889 (class 2606 OID 16753)
+-- TOC entry 4885 (class 2606 OID 16753)
 -- Name: sikayet_oneri sikayet_oneri_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -1173,7 +1180,7 @@ ALTER TABLE ONLY public.sikayet_oneri
 
 
 --
--- TOC entry 4883 (class 2606 OID 16702)
+-- TOC entry 4879 (class 2606 OID 16702)
 -- Name: tahliller tahliller_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -1182,7 +1189,7 @@ ALTER TABLE ONLY public.tahliller
 
 
 --
--- TOC entry 4879 (class 2606 OID 16905)
+-- TOC entry 4875 (class 2606 OID 16905)
 -- Name: randevular unique_doktor_randevu; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -1191,7 +1198,7 @@ ALTER TABLE ONLY public.randevular
 
 
 --
--- TOC entry 4881 (class 2606 OID 16894)
+-- TOC entry 4877 (class 2606 OID 16894)
 -- Name: randevular unique_doktor_randevu_cakismasi; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -1200,7 +1207,7 @@ ALTER TABLE ONLY public.randevular
 
 
 --
--- TOC entry 4885 (class 2606 OID 16720)
+-- TOC entry 4881 (class 2606 OID 16720)
 -- Name: yatislar yatislar_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -1209,7 +1216,7 @@ ALTER TABLE ONLY public.yatislar
 
 
 --
--- TOC entry 4911 (class 2620 OID 16896)
+-- TOC entry 4907 (class 2620 OID 16896)
 -- Name: tahliller trg_tahlil_eklendi; Type: TRIGGER; Schema: public; Owner: postgres
 --
 
@@ -1217,7 +1224,7 @@ CREATE TRIGGER trg_tahlil_eklendi AFTER INSERT ON public.tahliller FOR EACH ROW 
 
 
 --
--- TOC entry 4896 (class 2606 OID 16855)
+-- TOC entry 4892 (class 2606 OID 16855)
 -- Name: doktorlar doktorlar_kullanici_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -1226,7 +1233,7 @@ ALTER TABLE ONLY public.doktorlar
 
 
 --
--- TOC entry 4897 (class 2606 OID 16659)
+-- TOC entry 4893 (class 2606 OID 16659)
 -- Name: doktorlar doktorlar_poliklinik_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -1235,7 +1242,7 @@ ALTER TABLE ONLY public.doktorlar
 
 
 --
--- TOC entry 4898 (class 2606 OID 16929)
+-- TOC entry 4894 (class 2606 OID 16929)
 -- Name: doktorlar fk_doktor_poliklinik; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -1244,7 +1251,7 @@ ALTER TABLE ONLY public.doktorlar
 
 
 --
--- TOC entry 4900 (class 2606 OID 16911)
+-- TOC entry 4896 (class 2606 OID 16911)
 -- Name: randevular fk_randevu_doktor; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -1253,7 +1260,7 @@ ALTER TABLE ONLY public.randevular
 
 
 --
--- TOC entry 4901 (class 2606 OID 16906)
+-- TOC entry 4897 (class 2606 OID 16906)
 -- Name: randevular fk_randevu_hasta; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -1262,7 +1269,7 @@ ALTER TABLE ONLY public.randevular
 
 
 --
--- TOC entry 4904 (class 2606 OID 16897)
+-- TOC entry 4900 (class 2606 OID 16897)
 -- Name: tahliller fk_tahlil_randevu; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -1271,7 +1278,7 @@ ALTER TABLE ONLY public.tahliller
 
 
 --
--- TOC entry 4899 (class 2606 OID 16850)
+-- TOC entry 4895 (class 2606 OID 16850)
 -- Name: hastalar hastalar_kullanici_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -1280,7 +1287,7 @@ ALTER TABLE ONLY public.hastalar
 
 
 --
--- TOC entry 4909 (class 2606 OID 16739)
+-- TOC entry 4905 (class 2606 OID 16739)
 -- Name: otopark_kayitlari otopark_kayitlari_hasta_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -1289,7 +1296,7 @@ ALTER TABLE ONLY public.otopark_kayitlari
 
 
 --
--- TOC entry 4894 (class 2606 OID 16647)
+-- TOC entry 4890 (class 2606 OID 16647)
 -- Name: personeller personeller_birim_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -1298,7 +1305,7 @@ ALTER TABLE ONLY public.personeller
 
 
 --
--- TOC entry 4895 (class 2606 OID 16860)
+-- TOC entry 4891 (class 2606 OID 16860)
 -- Name: personeller personeller_kullanici_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -1307,7 +1314,7 @@ ALTER TABLE ONLY public.personeller
 
 
 --
--- TOC entry 4902 (class 2606 OID 16690)
+-- TOC entry 4898 (class 2606 OID 16690)
 -- Name: randevular randevular_doktor_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -1316,7 +1323,7 @@ ALTER TABLE ONLY public.randevular
 
 
 --
--- TOC entry 4903 (class 2606 OID 16685)
+-- TOC entry 4899 (class 2606 OID 16685)
 -- Name: randevular randevular_hasta_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -1325,7 +1332,7 @@ ALTER TABLE ONLY public.randevular
 
 
 --
--- TOC entry 4910 (class 2606 OID 16754)
+-- TOC entry 4906 (class 2606 OID 16754)
 -- Name: sikayet_oneri sikayet_oneri_hasta_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -1334,7 +1341,7 @@ ALTER TABLE ONLY public.sikayet_oneri
 
 
 --
--- TOC entry 4905 (class 2606 OID 16708)
+-- TOC entry 4901 (class 2606 OID 16708)
 -- Name: tahliller tahliller_doktor_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -1343,7 +1350,7 @@ ALTER TABLE ONLY public.tahliller
 
 
 --
--- TOC entry 4906 (class 2606 OID 16703)
+-- TOC entry 4902 (class 2606 OID 16703)
 -- Name: tahliller tahliller_hasta_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -1352,7 +1359,7 @@ ALTER TABLE ONLY public.tahliller
 
 
 --
--- TOC entry 4907 (class 2606 OID 16721)
+-- TOC entry 4903 (class 2606 OID 16721)
 -- Name: yatislar yatislar_hasta_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -1361,7 +1368,7 @@ ALTER TABLE ONLY public.yatislar
 
 
 --
--- TOC entry 4908 (class 2606 OID 16726)
+-- TOC entry 4904 (class 2606 OID 16726)
 -- Name: yatislar yatislar_sorumlu_hemsire_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -1369,11 +1376,11 @@ ALTER TABLE ONLY public.yatislar
     ADD CONSTRAINT yatislar_sorumlu_hemsire_id_fkey FOREIGN KEY (personel_id) REFERENCES public.personeller(id);
 
 
--- Completed on 2026-02-24 11:45:12
+-- Completed on 2026-02-25 14:54:23
 
 --
 -- PostgreSQL database dump complete
 --
 
-\unrestrict OZzgmSLgsoLvWT1Z0X13CJLQA02OFd4M8zfZgzsSViVctfhzrYA4e0DaIabEeAl
+\unrestrict KXFxEg0SBbQyrtTd9TvJ2QvWl9I57hnyHyApiqI3dH4zspiVBsFHEfIq9XFaLbF
 
