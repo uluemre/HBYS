@@ -1,0 +1,59 @@
+package com.hastane.hastane_backend.config;
+
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.stereotype.Component;
+import org.springframework.web.filter.OncePerRequestFilter;
+
+import java.io.IOException;
+
+@Component
+public class RequestLoggingFilter extends OncePerRequestFilter {
+
+    private static final Logger log = LoggerFactory.getLogger(RequestLoggingFilter.class);
+
+    @Override
+    protected void doFilterInternal(HttpServletRequest request,
+                                    HttpServletResponse response,
+                                    FilterChain filterChain) throws ServletException, IOException {
+
+        long start = System.currentTimeMillis();
+
+        try {
+            filterChain.doFilter(request, response);
+        } finally {
+            long durationMs = System.currentTimeMillis() - start;
+
+            String method = request.getMethod();
+            String path = request.getRequestURI();
+            int status = response.getStatus();
+
+            // ✅ Login olmuşsa tcNo + rol çek
+            String tcNo = "ANON";
+            String rol = "ANON";
+
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            if (auth != null && auth.isAuthenticated() && auth.getPrincipal() != null) {
+                Object principal = auth.getPrincipal();
+                if (principal instanceof String p) tcNo = p;
+
+                // authorities: ROLE_ADMIN vs...
+                if (auth.getAuthorities() != null && !auth.getAuthorities().isEmpty()) {
+                    rol = auth.getAuthorities().iterator().next().getAuthority();
+                }
+            }
+
+            // ✅ Şifre/token loglama YOK!
+            log.info("REQ {} {} -> {} ({}ms) user={} role={}",
+                    method, path, status, durationMs, tcNo, rol);
+        }
+    }
+}
