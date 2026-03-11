@@ -1,6 +1,6 @@
 import React from 'react';
 
-// 1. RANDEVULAR TABLOSU (Dinamik Yapı & Saat Bilgisi)
+// 1. RANDEVULAR TABLOSU
 export const TableRandevular = ({ veriler }) => (
   <div className="table-container">
     <div className="table-header">
@@ -18,7 +18,6 @@ export const TableRandevular = ({ veriler }) => (
         </tr>
       </thead>
       <tbody>
-        {/* App.jsx'den gelen veriler varsa listele, yoksa uyarı ver */}
         {veriler && veriler.length > 0 ? (
           veriler.map((item, index) => (
             <tr key={index}>
@@ -32,7 +31,12 @@ export const TableRandevular = ({ veriler }) => (
                 </div>
               </td>
               <td>
-                <span className={`status-badge ${item.durum === 'Onaylandı' ? 'status-active' : 'status-pending'}`}>
+                <span
+                  className={`status-badge ${(item.durum === 'Onaylandı' || item.durum === 'ONAYLANDI')
+                    ? 'status-active'
+                    : 'status-pending'
+                    }`}
+                >
                   {item.durum}
                 </span>
               </td>

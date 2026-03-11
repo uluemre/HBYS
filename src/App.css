@@ -756,3 +756,544 @@ body {
   color: #1a5f7a;
   border: 1px dashed #1a5f7a;
 }
+/* ===== MHRS FLOW EK STİLLERİ ===== */
+
+.mhrs-flow-shell {
+  background: white;
+  border-radius: 16px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+  padding: 24px;
+}
+
+.mhrs-step-top {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 22px;
+}
+
+.mhrs-step-top h3 {
+  font-size: 1.4rem;
+  color: #1a5f7a;
+  font-weight: 700;
+}
+
+.mhrs-back-btn {
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+  border: 1px solid #dbeafe;
+  background: #f8fbff;
+  cursor: pointer;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #1a5f7a;
+  transition: 0.25s;
+}
+
+.mhrs-back-btn:hover {
+  background: #e0f2fe;
+  transform: translateX(-2px);
+}
+
+.mhrs-action-grid {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr;
+  gap: 18px;
+}
+
+.mhrs-main-action-card,
+.mhrs-choice-card,
+.mhrs-list-card,
+.mhrs-hospital-card,
+.mhrs-doctor-card {
+  border: none;
+  cursor: pointer;
+  transition: 0.25s;
+}
+
+.mhrs-main-action-card {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  width: 100%;
+  border-radius: 18px;
+  padding: 24px;
+  text-align: left;
+  color: white;
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  box-shadow: 0 8px 24px rgba(220, 38, 38, 0.18);
+}
+
+.mhrs-main-action-card h3 {
+  margin-bottom: 6px;
+  font-size: 1.35rem;
+}
+
+.mhrs-main-action-card p {
+  opacity: 0.95;
+  font-size: 0.95rem;
+}
+
+.mhrs-main-action-card:hover {
+  transform: translateY(-2px);
+}
+
+.mhrs-main-action-icon {
+  width: 72px;
+  height: 72px;
+  border-radius: 18px;
+  background: rgba(255,255,255,0.18);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  flex-shrink: 0;
+}
+
+.mhrs-secondary-panel {
+  background: linear-gradient(135deg, #f8fafc 0%, #eef6ff 100%);
+  border: 1px solid #e2e8f0;
+  border-radius: 18px;
+  padding: 22px;
+}
+
+.mhrs-secondary-panel h3 {
+  color: #1e293b;
+  margin-bottom: 8px;
+}
+
+.mhrs-secondary-panel p {
+  color: #64748b;
+  line-height: 1.6;
+}
+
+.mhrs-choice-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+
+.mhrs-choice-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 24px;
+  border-radius: 18px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
+.mhrs-choice-card.poliklinik {
+  color: #7c3aed;
+  box-shadow: inset 5px 0 0 #7c3aed;
+}
+
+.mhrs-choice-card.konum {
+  color: #dc2626;
+  box-shadow: inset 5px 0 0 #dc2626;
+}
+
+.mhrs-choice-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0,0,0,0.06);
+}
+
+.mhrs-choice-icon {
+  font-size: 1.8rem;
+}
+
+.mhrs-list-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.mhrs-list-card {
+  width: 100%;
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 18px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  text-align: left;
+}
+
+.mhrs-list-card h4 {
+  font-size: 1.05rem;
+  margin-bottom: 4px;
+  color: #0f172a;
+}
+
+.mhrs-list-card p {
+  color: #64748b;
+  font-size: 0.92rem;
+}
+
+.mhrs-list-card span:last-child {
+  font-size: 1.5rem;
+  color: #94a3b8;
+}
+
+.mhrs-list-card:hover {
+  border-color: #38bdf8;
+  background: #f8fdff;
+}
+
+.mhrs-hospital-card {
+  width: 100%;
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 18px;
+  padding: 20px;
+  text-align: left;
+}
+
+.mhrs-hospital-card:hover {
+  border-color: #38bdf8;
+  transform: translateY(-2px);
+}
+
+.mhrs-hospital-header h4 {
+  font-size: 1.1rem;
+  color: #0f172a;
+  margin-bottom: 5px;
+}
+
+.mhrs-hospital-header p {
+  color: #64748b;
+}
+
+.mhrs-hospital-meta {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed #e2e8f0;
+  color: #1a5f7a;
+  font-weight: 600;
+  font-size: 0.92rem;
+}
+
+.mhrs-doctor-card {
+  width: 100%;
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 18px;
+  padding: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  text-align: left;
+}
+
+.mhrs-doctor-card:hover {
+  border-color: #38bdf8;
+  transform: translateY(-2px);
+}
+
+.mhrs-doctor-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.mhrs-doctor-left h4 {
+  color: #0f172a;
+  margin-bottom: 4px;
+}
+
+.mhrs-doctor-left p,
+.mhrs-doctor-left small {
+  color: #64748b;
+}
+
+.mhrs-doctor-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.mhrs-small-badge {
+  background: #ecfeff;
+  color: #0f766e;
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.mhrs-slot-group {
+  background: #f8fafc;
+  border-radius: 16px;
+  padding: 18px;
+  border: 1px solid #e2e8f0;
+}
+
+.mhrs-slot-date {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin-bottom: 6px;
+}
+
+.mhrs-slot-subtitle {
+  color: #64748b;
+  font-weight: 600;
+  margin-bottom: 14px;
+}
+
+.mhrs-slot-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  gap: 12px;
+}
+
+.mhrs-slot-btn {
+  border: 1px solid #dbeafe;
+  background: white;
+  color: #0f172a;
+  border-radius: 12px;
+  padding: 14px 10px;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.mhrs-slot-btn:hover {
+  background: #e0f2fe;
+  border-color: #38bdf8;
+}
+
+.mhrs-confirm-card {
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 18px;
+  padding: 24px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+}
+
+.mhrs-confirm-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  font-size: 1rem;
+}
+
+.mhrs-confirm-row span {
+  color: #0ea5e9;
+  font-weight: 700;
+}
+
+.mhrs-confirm-row strong {
+  color: #334155;
+  font-size: 1.2rem;
+}
+
+.mhrs-confirm-divider {
+  height: 1px;
+  border-top: 2px dashed #d1d5db;
+  margin: 18px 0;
+}
+
+.mhrs-confirm-block p {
+  margin-bottom: 10px;
+  color: #475569;
+  line-height: 1.5;
+}
+
+.mhrs-confirm-btn {
+  width: 100%;
+  margin-top: 18px;
+  border: none;
+  border-radius: 14px;
+  padding: 18px;
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  color: white;
+  font-size: 1.4rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: 0.25s;
+}
+
+.mhrs-confirm-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 20px rgba(220, 38, 38, 0.2);
+}
+
+.mhrs-empty-state {
+  background: #fff7ed;
+  border: 1px solid #fdba74;
+  color: #9a3412;
+  border-radius: 14px;
+  padding: 16px;
+  text-align: center;
+  font-weight: 600;
+}
+
+.mhrs-search-box {
+  display: flex;
+  gap: 12px;
+}
+
+.mhrs-inline-actions {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.schedule-summary-card {
+  background: linear-gradient(135deg, #eef6ff 0%, #f8fbff 100%);
+  border: 1px solid #dbeafe;
+  border-radius: 16px;
+  padding: 18px;
+  margin-bottom: 18px;
+}
+
+.schedule-summary-card h4 {
+  color: #0f172a;
+  margin-bottom: 5px;
+}
+
+.schedule-summary-card p {
+  color: #64748b;
+}
+
+.schedule-builder-card {
+  background: #f8fafc;
+  border-radius: 16px;
+  padding: 20px;
+  border: 1px solid #e2e8f0;
+  margin-bottom: 22px;
+}
+
+.schedule-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.schedule-label {
+  display: block;
+  margin-bottom: 6px;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.schedule-time-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(95px, 1fr));
+  gap: 10px;
+}
+
+.schedule-time-chip {
+  border: 1px solid #dbeafe;
+  background: white;
+  color: #1e293b;
+  border-radius: 12px;
+  padding: 12px 8px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.schedule-time-chip.active {
+  background: #1a5f7a;
+  color: white;
+  border-color: #1a5f7a;
+}
+
+.schedule-time-chip:hover {
+  border-color: #38bdf8;
+}
+
+@media (max-width: 992px) {
+  .mhrs-action-grid,
+  .mhrs-choice-grid,
+  .schedule-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .mhrs-doctor-card {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 14px;
+  }
+
+  .mhrs-doctor-right {
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 768px) {
+  .mhrs-step-top {
+    flex-direction: row;
+  }
+
+  .mhrs-flow-shell {
+    padding: 16px;
+  }
+
+  .mhrs-slot-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .mhrs-confirm-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+}
+.schedule-date-card {
+  background: linear-gradient(135deg, #ffffff 0%, #f8fbff 100%);
+  border: 1px solid #dbeafe;
+  border-radius: 16px;
+  padding: 14px;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.04);
+}
+
+.schedule-date-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #f8fafc;
+  border: 1.5px solid #dbeafe;
+  border-radius: 12px;
+  padding: 10px 14px;
+  transition: 0.25s;
+}
+
+.schedule-date-input-wrap:focus-within {
+  border-color: #38bdf8;
+  box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.12);
+  background: #ffffff;
+}
+
+.schedule-date-icon {
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+
+.schedule-date-input {
+  width: 100%;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 0.98rem;
+  font-weight: 600;
+  color: #1e293b;
+  padding: 4px 0;
+}
+
+.schedule-date-preview {
+  margin-top: 10px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #64748b;
+}

@@ -7,8 +7,10 @@ export const Sidebar = ({ rol, aktifSekme, setAktifSekme, logout }) => {
         { name: "Randevularım", icon: "📅" }
     ];
 
-    if (rol === "HASTA")     menuItems.push({ name: "Tahlillerim",   icon: "🧪" });
-    if (rol === "PERSONEL")  menuItems.push({ name: "Personel",      icon: "👥" });
+    if (rol === "HASTA") menuItems.push({ name: "Tahlillerim", icon: "🧪" });
+    menuItems.push({ name: "Otopark Durumu", icon: "🅿️" });
+    if (rol === "PERSONEL") menuItems.push({ name: "Personel", icon: "👥" });
+    if (rol === "DOKTOR") menuItems.push({ name: "Çalışma Takvimi", icon: "🗓️" });
 
     return (
         <aside style={{
@@ -22,7 +24,6 @@ export const Sidebar = ({ rol, aktifSekme, setAktifSekme, logout }) => {
             zIndex: 10,
             flexShrink: 0,
         }}>
-            {/* Logo */}
             <div style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -40,7 +41,6 @@ export const Sidebar = ({ rol, aktifSekme, setAktifSekme, logout }) => {
                 }}>HBYS</span>
             </div>
 
-            {/* Menü */}
             <nav style={{
                 flex: 1,
                 display: 'flex',
@@ -97,7 +97,6 @@ export const Sidebar = ({ rol, aktifSekme, setAktifSekme, logout }) => {
                 })}
             </nav>
 
-            {/* Çıkış */}
             <div style={{
                 padding: '14px 10px',
                 borderTop: '1px solid rgba(255,255,255,0.06)',
