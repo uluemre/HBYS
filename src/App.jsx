@@ -229,6 +229,72 @@ export default function App() {
       ).sort(slotSirala);
   };
 
+  // ─── Aynı doktora tekrar randevu engeli ───────────────────────────────────────
+  const RANDEVU_BLOKAJ_GUN = 2;
+
+  const aktifSurecDurumlari = [
+    "ONAYLANDI",
+    "HASTA_GELDI",
+    "MUAYENEDE",
+    "TAHLIL_BEKLENIYOR",
+    "TAHLIL_ISTENDI",
+    "SONUC_INCELENIYOR",
+    "DOKTOR_INCELEDI",
+    "RECETE_YAZILDI"
+  ];
+
+  const tarihFarkiGun = (tarih1, tarih2) => {
+    const d1 = new Date(`${tarih1}T00:00:00`);
+    const d2 = new Date(`${tarih2}T00:00:00`);
+    const farkMs = Math.abs(d2 - d1);
+    return Math.floor(farkMs / (1000 * 60 * 60 * 24));
+  };
+
+  const hastaninAyniDoktoraRandevuEngeli = (hastaId, doktorId, hedefTarih = null) => {
+    if (!hastaId || !doktorId) return null;
+
+    const ayniDoktorRandevulari = randevuListesi.filter(r =>
+      Number(r.hastaId) === Number(hastaId) &&
+      Number(r.doktorId) === Number(doktorId)
+    );
+
+    const aktifRandevu = ayniDoktorRandevulari.find(r =>
+      aktifSurecDurumlari.includes(r.durum)
+    );
+
+    if (aktifRandevu) {
+      return {
+        engelVar: true,
+        tip: "AKTIF_SUREC",
+        mesaj: `Bu doktorda aktif bir süreciniz var (${formatTarih(aktifRandevu.tarih)} ${aktifRandevu.saat}). Muayene tamamlanmadan yeni randevu alamazsınız.`
+      };
+    }
+
+    const tamamlananRandevular = ayniDoktorRandevulari
+      .filter(r => r.durum === "TAMAMLANDI")
+      .sort((a, b) => new Date(`${b.tarih}T${b.saat}`) - new Date(`${a.tarih}T${a.saat}`));
+
+    if (tamamlananRandevular.length > 0) {
+      const sonTamamlanan = tamamlananRandevular[0];
+      const kontrolTarihi = hedefTarih || bugunString;
+      const gunFarki = tarihFarkiGun(sonTamamlanan.tarih, kontrolTarihi);
+
+      if (gunFarki < RANDEVU_BLOKAJ_GUN) {
+        return {
+          engelVar: true,
+          tip: "BEKLEME_SURESI",
+          mesaj: `Aynı doktordan tekrar randevu almak için en az ${RANDEVU_BLOKAJ_GUN} gün beklemelisiniz. Son tamamlanan muayeneniz: ${formatTarih(sonTamamlanan.tarih)}.`
+        };
+      }
+    }
+
+    return {
+      engelVar: false,
+      tip: null,
+      mesaj: ""
+    };
+  };
+
   // ─── Randevu akış handler'ları ────────────────────────────────────────────────
   const resetHastaRandevuAkisi = () => {
     setHastaRandevuAkisi({ aramaTuru: "", il: "", poliklinik: "", hastaneId: "", doktorId: "", slotId: "" });
@@ -283,6 +349,25 @@ export default function App() {
   };
 
   const handleHastaSlotSec = (slotId) => {
+    const secilenSlot = randevuSlotlari.find(s => String(s.id) === String(slotId));
+    const hastaId = Number(girisYapanKullanici?.id);
+
+    if (!secilenSlot || !hastaId) {
+      alert("Slot bilgisi alınamadı.");
+      return;
+    }
+
+    const kontrol = hastaninAyniDoktoraRandevuEngeli(
+      hastaId,
+      secilenSlot.doktorId,
+      secilenSlot.tarih
+    );
+
+    if (kontrol?.engelVar) {
+      alert(kontrol.mesaj);
+      return;
+    }
+
     setHastaRandevuAkisi(prev => ({ ...prev, slotId }));
     setRandevuAdimi("onay");
   };
@@ -371,7 +456,7 @@ export default function App() {
         setTcNo(yeniHastaVerisi.tcNo);
       } else {
         let hata = "Kayıt hatası.";
-        try { hata = JSON.parse(responseText).message || hata; } catch { /* json parse hatası */ }
+        try { hata = JSON.parse(responseText).message || hata; } catch { }
         setHataMesaji(`❌ ${hata}`);
       }
     } catch {
@@ -382,11 +467,22 @@ export default function App() {
   // ─── Randevu al ───────────────────────────────────────────────────────────────
   const handleRandevuAl = async () => {
     if (!randevuOzeti) return alert("Randevu özeti oluşturulamadı.");
+
     const token = localStorage.getItem("token");
+    const hastaId = Number(girisYapanKullanici?.id);
+
     const ayniSlotDoluMu = randevuSlotlari.find(
       slot => Number(slot.id) === Number(randevuOzeti.slot.id) && slot.durum !== "MUSAIT"
     );
     if (ayniSlotDoluMu) return alert("Bu slot artık uygun değil. Lütfen tekrar seçim yapınız.");
+
+    const doktorEngeli = hastaninAyniDoktoraRandevuEngeli(
+      hastaId,
+      Number(randevuOzeti.doktor.id),
+      randevuOzeti.slot.tarih
+    );
+    if (doktorEngeli?.engelVar) return alert(doktorEngeli.mesaj);
+
     const randevuPaketi = {
       doktorId: Number(randevuOzeti.doktor.id),
       randevuTarihi: randevuOzeti.slot.tarih,
@@ -394,16 +490,18 @@ export default function App() {
       durum: "ONAYLANDI",
       sikayet: "Sistem üzerinden randevu alındı."
     };
+
     try {
       const response = await fetch(`${BASE_URL}/randevular`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify(randevuPaketi)
       });
+
       if (response.ok) {
         const yeniRandevu = {
-          // eslint-disable-next-line react-hooks/purity
-          id: `#${Date.now()}`, hastaId: Number(girisYapanKullanici?.id || 1),
+          id: `#${Date.now()}`,
+          hastaId,
           poliklinik: randevuOzeti.poliklinik,
           doktor: randevuOzeti.doktor.ad,
           doktorId: randevuOzeti.doktor.id,
@@ -413,7 +511,8 @@ export default function App() {
           durum: "ONAYLANDI",
           sikayet: "Sistem üzerinden randevu alındı."
         };
-        setRandevuListesi([yeniRandevu, ...randevuListesi]);
+
+        setRandevuListesi(prev => [yeniRandevu, ...prev]);
         setRandevuSlotlari(prev =>
           prev.map(slot => Number(slot.id) === Number(randevuOzeti.slot.id) ? { ...slot, durum: "DOLU" } : slot)
         );
@@ -857,6 +956,18 @@ export default function App() {
 
     const uygunDoktorlar = hastaRandevuAkisi.hastaneId && hastaRandevuAkisi.poliklinik
       ? hastaneVePoliklinigeGoreDoktorlar(hastaRandevuAkisi.hastaneId, hastaRandevuAkisi.poliklinik)
+          .map(doc => {
+            const kontrol = hastaninAyniDoktoraRandevuEngeli(
+              Number(girisYapanKullanici?.id),
+              Number(doc.id)
+            );
+
+            return {
+              ...doc,
+              randevuEngeliVar: kontrol?.engelVar || false,
+              randevuEngelMesaji: kontrol?.mesaj || ""
+            };
+          })
       : [];
 
     if (randevuAdimi === "ana") {
@@ -975,10 +1086,31 @@ export default function App() {
           <div className="mhrs-step-top"><button className="mhrs-back-btn" onClick={geriGitRandevuAkisi}>←</button><h3>Doktor Seçiniz</h3></div>
           <div className="mhrs-list-panel">
             {uygunDoktorlar.length > 0 ? uygunDoktorlar.map(doc => (
-              <button key={doc.id} className="mhrs-doctor-card" onClick={() => handleHastaDoktorSec(doc.id)}>
+              <button
+                key={doc.id}
+                className="mhrs-doctor-card"
+                onClick={() => {
+                  if (doc.randevuEngeliVar) {
+                    alert(doc.randevuEngelMesaji);
+                    return;
+                  }
+                  handleHastaDoktorSec(doc.id);
+                }}
+                disabled={doc.randevuEngeliVar}
+                style={doc.randevuEngeliVar ? { opacity: 0.6, cursor: 'not-allowed' } : {}}
+              >
                 <div className="mhrs-doctor-left">
                   <div className="doc-avatar">👨‍⚕️</div>
-                  <div><h4>{doc.ad}</h4><p>{doc.unvan}</p><small>{seciliHastane?.ad}</small></div>
+                  <div>
+                    <h4>{doc.ad}</h4>
+                    <p>{doc.unvan}</p>
+                    <small>{seciliHastane?.ad}</small>
+                    {doc.randevuEngeliVar && (
+                      <div style={{ marginTop: '6px', color: '#dc2626', fontSize: '0.85rem', fontWeight: 600 }}>
+                        Bu doktordan şu an tekrar randevu alamazsınız
+                      </div>
+                    )}
+                  </div>
                 </div>
                 <div className="mhrs-doctor-right">
                   <span className="mhrs-small-badge">Uygun {doc.uygunSlotSayisi}</span>
@@ -1015,6 +1147,12 @@ export default function App() {
     }
 
     if (randevuAdimi === "onay" && randevuOzeti) {
+      const onayKontrolu = hastaninAyniDoktoraRandevuEngeli(
+        Number(girisYapanKullanici?.id),
+        Number(randevuOzeti.doktor.id),
+        randevuOzeti.slot.tarih
+      );
+
       return (
         <div className="mhrs-flow-shell">
           <div className="mhrs-step-top"><button className="mhrs-back-btn" onClick={geriGitRandevuAkisi}>←</button><h3>Randevuyu Onayla</h3></div>
@@ -1029,7 +1167,29 @@ export default function App() {
               <p><b>Randevu Sahibi:</b> {girisYapanKullanici.adSoyad}</p>
             </div>
           </div>
-          <button className="mhrs-confirm-btn" onClick={handleRandevuAl}>Randevuyu Onayla</button>
+
+          {onayKontrolu?.engelVar && (
+            <div style={{
+              marginTop: '14px',
+              marginBottom: '10px',
+              padding: '12px 14px',
+              background: '#fee2e2',
+              color: '#991b1b',
+              borderRadius: '10px',
+              fontWeight: 600
+            }}>
+              {onayKontrolu.mesaj}
+            </div>
+          )}
+
+          <button
+            className="mhrs-confirm-btn"
+            onClick={handleRandevuAl}
+            disabled={onayKontrolu?.engelVar}
+            style={onayKontrolu?.engelVar ? { opacity: 0.6, cursor: 'not-allowed' } : {}}
+          >
+            Randevuyu Onayla
+          </button>
         </div>
       );
     }

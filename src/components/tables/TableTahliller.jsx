@@ -1,38 +1,75 @@
 import React from 'react';
 
-const TableTahliller = () => (
-    <div className="table-container">
-        <div className="table-header">
-            <h3>🔬 Laboratuvar Tahlil Sonuçları</h3>
-        </div>
-        <table className="modern-table">
-            <thead>
-                <tr>
-                    <th>Tahlil Adı</th>
-                    <th>Sonuç Değeri</th>
-                    <th>Referans Aralığı</th>
-                    <th>Birim</th>
-                    <th>Durum</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr>
-                    <td>Hemoglobin (HGB)</td>
-                    <td>14.2</td>
-                    <td>13.5 - 17.5</td>
-                    <td>g/dL</td>
-                    <td><span className="status-badge status-active">Normal</span></td>
-                </tr>
-                <tr>
-                    <td>B12 Vitamini</td>
-                    <td>180</td>
-                    <td>200 - 900</td>
-                    <td>pg/mL</td>
-                    <td><span className="status-badge status-cancel">Düşük</span></td>
-                </tr>
-            </tbody>
-        </table>
+const durumClassGetir = (durum) => {
+  if (
+    durum === "SONUCLANDI" ||
+    durum === "DOKTOR_INCELEDI" ||
+    durum === "RECETE_YAZILDI" ||
+    durum === "TAMAMLANDI"
+  ) {
+    return "status-active";
+  }
+
+  if (
+    durum === "ISTENDI" ||
+    durum === "LABORATUVARDA" ||
+    durum === "TAHLIL_BEKLENIYOR" ||
+    durum === "SONUC_INCELENIYOR"
+  ) {
+    return "status-pending";
+  }
+
+  return "status-inactive";
+};
+
+const TableTahliller = ({ veriler = [] }) => (
+  <div className="table-container">
+    <div className="table-header">
+      <h3>🔬 Laboratuvar Tahlil Sonuçları</h3>
     </div>
+
+    <table className="modern-table">
+      <thead>
+        <tr>
+          <th>Muayene Tarihi</th>
+          <th>Poliklinik</th>
+          <th>Doktor</th>
+          <th>Tahlil Adı</th>
+          <th>Sonuç Özeti</th>
+          <th>Sonuç Tarihi</th>
+          <th>Reçete Durumu</th>
+          <th>Durum</th>
+        </tr>
+      </thead>
+
+      <tbody>
+        {veriler.length > 0 ? (
+          veriler.map((item, index) => (
+            <tr key={`${item.tahlilTuru}-${item.muayeneTarihi}-${index}`}>
+              <td>{item.muayeneTarihi}</td>
+              <td>{item.poliklinik}</td>
+              <td>{item.doktor}</td>
+              <td>{item.tahlilTuru}</td>
+              <td>{item.sonucOzeti}</td>
+              <td>{item.sonucTarihi}</td>
+              <td>{item.receteDurumu}</td>
+              <td>
+                <span className={`status-badge ${durumClassGetir(item.durum)}`}>
+                  {item.durum}
+                </span>
+              </td>
+            </tr>
+          ))
+        ) : (
+          <tr>
+            <td colSpan="8" style={{ textAlign: 'center', padding: '20px', color: '#64748b' }}>
+              Henüz görüntülenecek tahlil sonucu bulunmuyor.
+            </td>
+          </tr>
+        )}
+      </tbody>
+    </table>
+  </div>
 );
 
 export default TableTahliller;
