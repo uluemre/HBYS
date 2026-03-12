@@ -1382,9 +1382,9 @@ body {
 }
 
 .schedule-time-chip.active {
-  background: #1a5f7a !important;
-  color: white !important;
-  border-color: #1a5f7a !important;
+  background: #1a5f7a;
+  color: white;
+  border-color: #1a5f7a;
 }
 
 .schedule-time-chip:hover {
@@ -1476,4 +1476,135 @@ body {
   font-size: 0.88rem;
   font-weight: 600;
   color: #64748b;
+}
+
+
+
+/* ===== MUAYENE SÜREÇ PANELİ ===== */
+
+.muayene-flow-list {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.muayene-flow-card {
+  background: linear-gradient(135deg, #ffffff 0%, #f8fbff 100%);
+  border: 1px solid #dbeafe;
+  border-radius: 18px;
+  padding: 18px;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.04);
+}
+
+.muayene-flow-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.muayene-flow-top h4 {
+  color: #0f172a;
+  margin-bottom: 6px;
+  font-size: 1.05rem;
+}
+
+.muayene-flow-top p {
+  color: #64748b;
+  font-size: 0.92rem;
+}
+
+.muayene-flow-meta {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 14px;
+  color: #334155;
+  font-size: 0.93rem;
+}
+
+.surec-adimlari {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.surec-chip {
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: #64748b;
+  font-size: 0.8rem;
+  font-weight: 700;
+  border: 1px solid #e2e8f0;
+}
+
+.surec-chip.active {
+  background: #dcfce7;
+  color: #166534;
+  border-color: #bbf7d0;
+}
+
+.muayene-detay-box {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 14px;
+  margin-bottom: 14px;
+}
+
+.muayene-detay-box p {
+  color: #475569;
+  margin-bottom: 8px;
+  line-height: 1.5;
+}
+
+.muayene-detay-box p:last-child {
+  margin-bottom: 0;
+}
+
+.muayene-action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.process-btn {
+  border: none;
+  border-radius: 12px;
+  padding: 10px 14px;
+  background: #1a5f7a;
+  color: white;
+  font-weight: 700;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.process-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 16px rgba(26, 95, 122, 0.18);
+}
+
+.process-btn.secondary {
+  background: #0ea5e9;
+}
+
+.process-btn.success {
+  background: #10b981;
+}
+
+.process-btn.complete {
+  background: #334155;
+}
+
+@media (max-width: 900px) {
+  .muayene-flow-meta {
+    grid-template-columns: 1fr;
+  }
+
+  .muayene-flow-top {
+    flex-direction: column;
+  }
 }

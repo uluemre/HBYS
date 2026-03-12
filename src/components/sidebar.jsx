@@ -10,8 +10,10 @@ export const Sidebar = ({ rol, aktifSekme, setAktifSekme, logout }) => {
     if (rol === "HASTA") menuItems.push({ name: "Tahlillerim", icon: "🧪" });
     menuItems.push({ name: "Otopark Durumu", icon: "🅿️" });
     if (rol === "PERSONEL") menuItems.push({ name: "Personel", icon: "👥" });
-    if (rol === "DOKTOR") menuItems.push({ name: "Çalışma Takvimi", icon: "🗓️" });
-
+    if (rol === "DOKTOR") {
+        menuItems.push({ name: "Muayene Süreçleri", icon: "🩺" });
+        menuItems.push({ name: "Çalışma Takvimi", icon: "🗓️" });
+    }
     return (
         <aside style={{
             width: '260px',
