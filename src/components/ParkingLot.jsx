@@ -31,7 +31,7 @@ export default function ParkingLot() {
 
         fetchParkingData();
 
-        const interval = setInterval(fetchParkingData, 5000);
+        const interval = setInterval(fetchParkingData, 120000);
 
         return () => clearInterval(interval);
 

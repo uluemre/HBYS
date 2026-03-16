@@ -20,6 +20,7 @@ export default function App() {
 
   // ─── Auth state ───────────────────────────────────────────────────────────────
   const [girisYapanKullanici, setGirisYapanKullanici] = useState(null);
+  const [otomatikGirisYukleniyor, setOtomatikGirisYukleniyor] = useState(true);
   const [tcNo, setTcNo] = useState("");
   const [sifre, setSifre] = useState("");
   const [hataMesaji, setHataMesaji] = useState("");
@@ -83,14 +84,6 @@ export default function App() {
     return kayit ? JSON.parse(kayit) : [];
   });
 
-  // ─── localStorage sync ───────────────────────────────────────────────────────
-  useEffect(() => { localStorage.setItem("hastane_randevular", JSON.stringify(randevuListesi)); }, [randevuListesi]);
-  useEffect(() => { localStorage.setItem("hastane_randevu_slotlari", JSON.stringify(randevuSlotlari)); }, [randevuSlotlari]);
-  useEffect(() => { localStorage.setItem("muayene_kayitlari", JSON.stringify(muayeneKayitlari)); }, [muayeneKayitlari]);
-  useEffect(() => { localStorage.setItem("tahlil_istekleri", JSON.stringify(tahlilIstekleri)); }, [tahlilIstekleri]);
-  useEffect(() => { localStorage.setItem("tahlil_sonuclari", JSON.stringify(tahlilSonuclari)); }, [tahlilSonuclari]);
-  useEffect(() => { localStorage.setItem("receteler", JSON.stringify(receteler)); }, [receteler]);
-
   // ─── Bekleme süresi ───────────────────────────────────────────────────────────
   const [beklemeSuresi, setBeklemeSuresi] = useState(() => {
     const savedUntil = localStorage.getItem("lock_until");
@@ -101,6 +94,85 @@ export default function App() {
     return 0;
   });
 
+  // ─── useEffect'ler ────────────────────────────────────────────────────────────
+
+  // Sayfa yenilenince token varsa otomatik giriş
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+
+    if (!token) {
+      setOtomatikGirisYukleniyor(false);
+      return;
+    }
+
+    const decodeToken = (t) => {
+      try {
+        return JSON.parse(atob(t.split('.')[1]));
+      } catch {
+        return null;
+      }
+    };
+
+    const payload = decodeToken(token);
+
+    if (!payload) {
+      localStorage.removeItem("token");
+      setOtomatikGirisYukleniyor(false);
+      return;
+    }
+
+    const rolEndpointleri = {
+      DOKTOR: "/doktorlar/me",
+      PERSONEL: "/personel/me",
+      BASHEKIM: "/bashekim/me",
+      HASTA: "/hastalar/me",
+    };
+
+    const endpoint = rolEndpointleri[payload.rol] || "/hastalar/me";
+
+    fetch(`${BASE_URL}${endpoint}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+      .then(res => {
+        if (!res.ok) {
+          localStorage.removeItem("token");
+          return null;
+        }
+        return res.json();
+      })
+      .then(kisi => {
+        if (kisi) {
+          setGirisYapanKullanici({
+            id: payload.id || payload.sub,
+            rol: payload.rol,
+            tc: payload.tcNo,
+            adSoyad: kisi.adSoyad || "—",
+            cinsiyet: kisi.cinsiyet || null,
+            kanGrubu: kisi.kanGrubu || null,
+            telefon: kisi.telefon || null,
+            adres: kisi.adres || null,
+            dogumTarihi: kisi.dogumTarihi || null,
+            unvan: kisi.unvan || (payload.rol === "BASHEKIM" ? "Başhekim" : null),
+            brans: kisi.brans || kisi.uzmanlikAlani || null,
+            uzmanlikAlani: kisi.uzmanlikAlani || null,
+            poliklinikIsmi: kisi.poliklinikIsmi || null,
+            iseGirisTarihi: kisi.iseGirisTarihi || null,
+          });
+        }
+      })
+      .catch(() => localStorage.removeItem("token"))
+      .finally(() => setOtomatikGirisYukleniyor(false));
+  }, []);
+
+  // localStorage sync
+  useEffect(() => { localStorage.setItem("hastane_randevular", JSON.stringify(randevuListesi)); }, [randevuListesi]);
+  useEffect(() => { localStorage.setItem("hastane_randevu_slotlari", JSON.stringify(randevuSlotlari)); }, [randevuSlotlari]);
+  useEffect(() => { localStorage.setItem("muayene_kayitlari", JSON.stringify(muayeneKayitlari)); }, [muayeneKayitlari]);
+  useEffect(() => { localStorage.setItem("tahlil_istekleri", JSON.stringify(tahlilIstekleri)); }, [tahlilIstekleri]);
+  useEffect(() => { localStorage.setItem("tahlil_sonuclari", JSON.stringify(tahlilSonuclari)); }, [tahlilSonuclari]);
+  useEffect(() => { localStorage.setItem("receteler", JSON.stringify(receteler)); }, [receteler]);
+
+  // Bekleme süresi geri sayımı
   useEffect(() => {
     let timer;
     if (beklemeSuresi > 0) {
@@ -233,14 +305,9 @@ export default function App() {
   const RANDEVU_BLOKAJ_GUN = 2;
 
   const aktifSurecDurumlari = [
-    "ONAYLANDI",
-    "HASTA_GELDI",
-    "MUAYENEDE",
-    "TAHLIL_BEKLENIYOR",
-    "TAHLIL_ISTENDI",
-    "SONUC_INCELENIYOR",
-    "DOKTOR_INCELEDI",
-    "RECETE_YAZILDI"
+    "ONAYLANDI", "HASTA_GELDI", "MUAYENEDE",
+    "TAHLIL_BEKLENIYOR", "TAHLIL_ISTENDI",
+    "SONUC_INCELENIYOR", "DOKTOR_INCELEDI", "RECETE_YAZILDI"
   ];
 
   const tarihFarkiGun = (tarih1, tarih2) => {
@@ -258,9 +325,7 @@ export default function App() {
       Number(r.doktorId) === Number(doktorId)
     );
 
-    const aktifRandevu = ayniDoktorRandevulari.find(r =>
-      aktifSurecDurumlari.includes(r.durum)
-    );
+    const aktifRandevu = ayniDoktorRandevulari.find(r => aktifSurecDurumlari.includes(r.durum));
 
     if (aktifRandevu) {
       return {
@@ -288,11 +353,7 @@ export default function App() {
       }
     }
 
-    return {
-      engelVar: false,
-      tip: null,
-      mesaj: ""
-    };
+    return { engelVar: false, tip: null, mesaj: "" };
   };
 
   // ─── Randevu akış handler'ları ────────────────────────────────────────────────
@@ -357,11 +418,7 @@ export default function App() {
       return;
     }
 
-    const kontrol = hastaninAyniDoktoraRandevuEngeli(
-      hastaId,
-      secilenSlot.doktorId,
-      secilenSlot.tarih
-    );
+    const kontrol = hastaninAyniDoktoraRandevuEngeli(hastaId, secilenSlot.doktorId, secilenSlot.tarih);
 
     if (kontrol?.engelVar) {
       alert(kontrol.mesaj);
@@ -476,11 +533,7 @@ export default function App() {
     );
     if (ayniSlotDoluMu) return alert("Bu slot artık uygun değil. Lütfen tekrar seçim yapınız.");
 
-    const doktorEngeli = hastaninAyniDoktoraRandevuEngeli(
-      hastaId,
-      Number(randevuOzeti.doktor.id),
-      randevuOzeti.slot.tarih
-    );
+    const doktorEngeli = hastaninAyniDoktoraRandevuEngeli(hastaId, Number(randevuOzeti.doktor.id), randevuOzeti.slot.tarih);
     if (doktorEngeli?.engelVar) return alert(doktorEngeli.mesaj);
 
     const randevuPaketi = {
@@ -956,18 +1009,10 @@ export default function App() {
 
     const uygunDoktorlar = hastaRandevuAkisi.hastaneId && hastaRandevuAkisi.poliklinik
       ? hastaneVePoliklinigeGoreDoktorlar(hastaRandevuAkisi.hastaneId, hastaRandevuAkisi.poliklinik)
-          .map(doc => {
-            const kontrol = hastaninAyniDoktoraRandevuEngeli(
-              Number(girisYapanKullanici?.id),
-              Number(doc.id)
-            );
-
-            return {
-              ...doc,
-              randevuEngeliVar: kontrol?.engelVar || false,
-              randevuEngelMesaji: kontrol?.mesaj || ""
-            };
-          })
+        .map(doc => {
+          const kontrol = hastaninAyniDoktoraRandevuEngeli(Number(girisYapanKullanici?.id), Number(doc.id));
+          return { ...doc, randevuEngeliVar: kontrol?.engelVar || false, randevuEngelMesaji: kontrol?.mesaj || "" };
+        })
       : [];
 
     if (randevuAdimi === "ana") {
@@ -1090,10 +1135,7 @@ export default function App() {
                 key={doc.id}
                 className="mhrs-doctor-card"
                 onClick={() => {
-                  if (doc.randevuEngeliVar) {
-                    alert(doc.randevuEngelMesaji);
-                    return;
-                  }
+                  if (doc.randevuEngeliVar) { alert(doc.randevuEngelMesaji); return; }
                   handleHastaDoktorSec(doc.id);
                 }}
                 disabled={doc.randevuEngeliVar}
@@ -1152,7 +1194,6 @@ export default function App() {
         Number(randevuOzeti.doktor.id),
         randevuOzeti.slot.tarih
       );
-
       return (
         <div className="mhrs-flow-shell">
           <div className="mhrs-step-top"><button className="mhrs-back-btn" onClick={geriGitRandevuAkisi}>←</button><h3>Randevuyu Onayla</h3></div>
@@ -1167,21 +1208,11 @@ export default function App() {
               <p><b>Randevu Sahibi:</b> {girisYapanKullanici.adSoyad}</p>
             </div>
           </div>
-
           {onayKontrolu?.engelVar && (
-            <div style={{
-              marginTop: '14px',
-              marginBottom: '10px',
-              padding: '12px 14px',
-              background: '#fee2e2',
-              color: '#991b1b',
-              borderRadius: '10px',
-              fontWeight: 600
-            }}>
+            <div style={{ marginTop: '14px', marginBottom: '10px', padding: '12px 14px', background: '#fee2e2', color: '#991b1b', borderRadius: '10px', fontWeight: 600 }}>
               {onayKontrolu.mesaj}
             </div>
           )}
-
           <button
             className="mhrs-confirm-btn"
             onClick={handleRandevuAl}
@@ -1198,13 +1229,29 @@ export default function App() {
   };
 
   // ─── Render ───────────────────────────────────────────────────────────────────
+  if (otomatikGirisYukleniyor) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', fontSize: '1.2rem', color: '#64748b' }}>
+        Yükleniyor...
+      </div>
+    );
+  }
+
   if (!girisYapanKullanici) {
     return (
       <Login
-        handleGiris={handleGiris} tcNo={tcNo} setTcNo={setTcNo} sifre={sifre} setSifre={setSifre}
-        hataMesaji={hataMesaji} kayitModu={kayitModu} setKayitModu={setKayitModu}
-        geriDon={() => setKayitModu(false)} yeniHastaEkle={yeniHastaEkle}
-        beklemeSuresi={beklemeSuresi} isBanned={isBanned}
+        handleGiris={handleGiris}
+        tcNo={tcNo}
+        setTcNo={setTcNo}
+        sifre={sifre}
+        setSifre={setSifre}
+        hataMesaji={hataMesaji}
+        kayitModu={kayitModu}
+        setKayitModu={setKayitModu}
+        geriDon={() => setKayitModu(false)}
+        yeniHastaEkle={yeniHastaEkle}
+        beklemeSuresi={beklemeSuresi}
+        isBanned={isBanned}
       />
     );
   }
