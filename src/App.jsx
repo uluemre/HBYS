@@ -123,7 +123,7 @@ export default function App() {
 
     const rolEndpointleri = {
       DOKTOR: "/doktorlar/me",
-      PERSONEL: "/personel/me",
+      PERSONEL: "/personeller/me",
       BASHEKIM: "/bashekim/me",
       HASTA: "/hastalar/me",
     };
@@ -440,6 +440,8 @@ export default function App() {
         body: JSON.stringify({ tcNo, sifre })
       });
       const result = await response.json();
+      console.log("LOGIN RESULT:", JSON.stringify(result)); // ← BU SATIRI EKLE
+
       if (result.success) {
         setDenemeSayisi(0);
         const token = result.data?.token || result.token;
@@ -448,7 +450,7 @@ export default function App() {
         const rol = result.data.rol;
         const endpoint =
           rol === "DOKTOR" ? "/doktorlar/me" :
-            rol === "PERSONEL" ? "/personel/me" :
+            rol === "PERSONEL" ? "/personeller/me" :
               rol === "BASHEKIM" ? "/bashekim/me" :
                 "/hastalar/me";
         const res = await fetch(`${BASE_URL}${endpoint}`, {
