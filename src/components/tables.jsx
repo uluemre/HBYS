@@ -3,7 +3,7 @@
 // Yeni importları şöyle kullan:
 //   import { TableRandevular, TableTahliller, ... } from './tables';
 
-export { default as TableRandevular } from './tables/TableRandevular';
-export { default as TableTahliller } from './tables/TableTahliller';
-export { default as TableOtopark } from './tables/TableOtopark';
-export { TableYatislar, TableSikayet, TablePersonel } from './tables/TableDiger';
+//export { default as TableRandevular } from './tables/TableRandevular';
+//export { default as TableTahliller } from './tables/TableTahliller';
+//export { default as TableOtopark } from './tables/TableOtopark';
+//export { TableYatislar, TableSikayet, TablePersonel } from './tables/TableDiger';
