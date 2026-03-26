@@ -1,2111 +1,314 @@
-import { useState, useEffect, useMemo } from 'react';
-import './App.css';
+import { useState, useMemo, useCallback } from "react";import "./App.css";
 
-import { Login } from './components/login/index.jsx';
-import { Sidebar } from './components/sidebar';
-import ParkingLot from './components/ParkingLot';
+// ─── Hooks ────────────────────────────────────────────────────────────────────
+import { useAuth } from "./hooks/useAuth";
+import { useRandevu } from "./hooks/useRandevu";
+import { useMuayene } from "./hooks/useMuayene";
+import { useDoktorTakvim } from "./hooks/useDoktorTakvim";
 
-import { TableRandevular, TableTahliller, TableYatislar, TableSikayet, TablePersonel } from './components/tables/index.js';
-import { PatientProfileInfo, DoctorProfileInfo } from './components/profile/ProfileComponents';
+// ─── Bileşenler ───────────────────────────────────────────────────────────────
+import { Login } from "./components/login/index.jsx";
+import { Sidebar } from "./components/sidebar";
+import ParkingLot from "./components/ParkingLot";
+import { PatientProfileInfo, DoctorProfileInfo } from "./components/profile/ProfileComponents";
+import { TableRandevular, TableTahliller, TableYatislar, TableSikayet, TablePersonel } from "./components/tables/index.js";
+import HastaRandevuAkisi from "./components/hasta/HastaRandevuAkisi";
+import MuayeneSurecleri from "./components/doktor/MuayeneSurecleri";
+import CalismaTakvimi from "./components/doktor/CalismaTakvimi";
+import {
+  BashekimDashboard,
+  BashekimSikayetleri,
+  BashekimNobetleri,
+  BashekimPerformansAnalizi,
+} from "./components/bashekim/BashekimPaneller";
 
-import { HASTANELER, SAAT_SECENEKLERI, BASHEKIM_DEMO_NOBETLERI, BASHEKIM_DEMO_SIKAYETLERI, TETKIK_SABLONLARI } from './constants/hastaneler';
-import { DOKTOR_LISTESI, DOKTOR_HAVUZU } from './constants/doktorlar';
-import { formatTarih, normalizeText, slotSirala, hesaplaMesafeKm, createInitialSlots, futureDate } from './utils/helpers';
+// ─── Sabitler ─────────────────────────────────────────────────────────────────
+import { DOKTOR_LISTESI, DOKTOR_HAVUZU } from "./constants/doktorlar";
+import { BASHEKIM_DEMO_SIKAYETLERI } from "./constants/hastaneler";
+import { normalizeText, slotSirala } from "./utils/helpers";
+import { apiMuayeneUcretiGuncelle } from "./api";
+import {
+  haftaBaslangici, haftaBitisi, ayBaslangici, ayBitisi, tarihAraliktaMi,
+} from "./hooks/useDoktorTakvim";
 
-const BASE_URL = "http://192.168.233.106:8081/api";
-const MAX_DENEME = 3;
 const MIN_MUAYENE_UCRETI = 1000;
 const MAX_MUAYENE_UCRETI = 3000;
-const MIN_HAFTALIK_CALISMA_SAATI = 40;
-const MAX_HAFTALIK_CALISMA_SAATI = 45;
-const VARSAYILAN_HAFTALIK_HEDEF = 40;
-const SLOT_SURESI_SAAT = 1;
 
 export default function App() {
-  const bugunString = new Date().toISOString().split('T')[0];
+  const bugunString = new Date().toISOString().split("T")[0];
 
-  // ─── Auth state ───────────────────────────────────────────────────────────────
-  const [girisYapanKullanici, setGirisYapanKullanici] = useState(null);
-  const [otomatikGirisYukleniyor, setOtomatikGirisYukleniyor] = useState(true);
-  const [tcNo, setTcNo] = useState("");
-  const [sifre, setSifre] = useState("");
-  const [hataMesaji, setHataMesaji] = useState("");
+  // ─── Hooks ──────────────────────────────────────────────────────────────────
+  const auth = useAuth();
+  const { girisYapanKullanici, setGirisYapanKullanici, yukleniyor, cikisYap } = auth;
+
   const [aktifSekme, setAktifSekme] = useState("Ana Sayfa");
-  const [kayitModu, setKayitModu] = useState(false);
-  const [denemeSayisi, setDenemeSayisi] = useState(0);
-  const [isBanned] = useState(localStorage.getItem("system_ban") === "true");
-  const [seciliIl, setSeciliIl] = useState("");
-  const [, setSeciliPoliklinik] = useState("");
-  const [bulunanKonum, setBulunanKonum] = useState({
-    il: "",
-    ilce: "",
-    detay: "",
-    latitude: null,
-    longitude: null
-  });
-  const [konumYukleniyor, setKonumYukleniyor] = useState(false);
-  const [, setAramaSonuclari] = useState([]);
-  const [muayeneUcretiInput, setMuayeneUcretiInput] = useState("");
+
+  const randevu = useRandevu(girisYapanKullanici, setAktifSekme);
+  const { randevuListesi, setRandevuListesi, randevuSlotlari, setRandevuSlotlari } = randevu;
+
+  const muayene = useMuayene(randevuListesi, setRandevuListesi);
+
+  const takvim = useDoktorTakvim(
+    randevuSlotlari,
+    setRandevuSlotlari,
+    muayene.muayeneKayitlari,
+    randevuListesi
+  );
+
+  // ─── Muayene ücreti state ────────────────────────────────────────────────────
+  const [muayeneUcretiInput, setMuayeneUcretiInput] = useState(
+    girisYapanKullanici?.muayeneUcreti != null
+      ? String(girisYapanKullanici.muayeneUcreti)
+      : ""
+  );
   const [ucretGuncelleniyor, setUcretGuncelleniyor] = useState(false);
 
-  const [doktorHaftalikPlanlari, setDoktorHaftalikPlanlari] = useState(() => {
-    const kayit = localStorage.getItem("doktor_haftalik_planlari");
-    return kayit ? JSON.parse(kayit) : {};
-  });
-
-  const [nobetListesi, setNobetListesi] = useState(() => {
-    const kayit = localStorage.getItem("bashekim_nobet_listesi");
-    return kayit ? JSON.parse(kayit) : BASHEKIM_DEMO_NOBETLERI;
-  });
-
+  // ─── Performans filtre state ─────────────────────────────────────────────────
   const [performansFiltreTipi, setPerformansFiltreTipi] = useState("haftalik");
   const [performansReferansTarihi, setPerformansReferansTarihi] = useState(bugunString);
-  const [performansBaslangicTarihi, setPerformansBaslangicTarihi] = useState(bugunString);
-  const [performansBitisTarihi, setPerformansBitisTarihi] = useState(bugunString);
+  const [performansBaslangic, setPerformansBaslangic] = useState(bugunString);
+  const [performansBitis, setPerformansBitis] = useState(bugunString);
 
-  // ─── Randevu akış state ───────────────────────────────────────────────────────
-  const [randevuAdimi, setRandevuAdimi] = useState("ana");
-  const [hastaRandevuAkisi, setHastaRandevuAkisi] = useState({
-    aramaTuru: "", il: "", poliklinik: "", hastaneId: "", doktorId: "", slotId: ""
-  });
+  // ─── Aktif doktor demo kaydı ─────────────────────────────────────────────────
+  const aktifDoktorDemoKaydi = useMemo(() => {
+    if (!girisYapanKullanici || !["DOKTOR", "BASHEKIM"].includes(girisYapanKullanici.rol))
+      return null;
 
-  // ─── Doktor takvim state ──────────────────────────────────────────────────────
-  const [doktorTakvimFormu, setDoktorTakvimFormu] = useState({
-    hastaneId: "", tarih: "", seciliSaatler: []
-  });
-
-  // ─── Randevu / slot state ─────────────────────────────────────────────────────
-  const [randevuListesi, setRandevuListesi] = useState(() => {
-    const kaydedilmis = localStorage.getItem("hastane_randevular");
-    return kaydedilmis ? JSON.parse(kaydedilmis) : [
-      {
-        id: "#1284",
-        hastaId: 1,
-        poliklinik: "Göz Hastalıkları",
-        doktor: "Dr. Ali Bakış",
-        doktorId: 5,
-        hastane: "İstanbul Şehir Hastanesi",
-        tarih: futureDate(1),
-        saat: "10:30",
-        durum: "ONAYLANDI",
-        sikayet: "Sistem üzerinden randevu alındı."
-      }
-    ];
-  });
-
-  const [randevuSlotlari, setRandevuSlotlari] = useState(() => {
-    const kaydedilmis = localStorage.getItem("hastane_randevu_slotlari");
-    return kaydedilmis ? JSON.parse(kaydedilmis) : createInitialSlots();
-  });
-
-  // ─── Muayene / tahlil / reçete state ─────────────────────────────────────────
-  const [muayeneKayitlari, setMuayeneKayitlari] = useState(() => {
-    const kayit = localStorage.getItem("muayene_kayitlari");
-    return kayit ? JSON.parse(kayit) : [];
-  });
-
-  const [tahlilIstekleri, setTahlilIstekleri] = useState(() => {
-    const kayit = localStorage.getItem("tahlil_istekleri");
-    return kayit ? JSON.parse(kayit) : [];
-  });
-
-  const [tahlilSonuclari, setTahlilSonuclari] = useState(() => {
-    const kayit = localStorage.getItem("tahlil_sonuclari");
-    return kayit ? JSON.parse(kayit) : [];
-  });
-
-  const [receteler, setReceteler] = useState(() => {
-    const kayit = localStorage.getItem("receteler");
-    return kayit ? JSON.parse(kayit) : [];
-  });
-
-  // ─── Bekleme süresi ───────────────────────────────────────────────────────────
-  const [beklemeSuresi, setBeklemeSuresi] = useState(() => {
-    const savedUntil = localStorage.getItem("lock_until");
-    if (savedUntil) {
-      const remaining = Math.round((parseInt(savedUntil) - Date.now()) / 1000);
-      return remaining > 0 ? remaining : 0;
-    }
-    return 0;
-  });
-
-  // ─── yardımcılar ──────────────────────────────────────────────────────────────
-  const formatTL = (value) => {
-    if (value == null || value === "") return "Belirlenmedi";
-    return `${Number(value).toLocaleString('tr-TR')} TL`;
-  };
-
-  const parseApiPayload = (raw) => {
-    return raw?.data ?? raw;
-  };
-
-  const buildKullaniciFromMe = ({ me, rol, fallbackId, fallbackTc }) => ({
-    id: me?.id ?? fallbackId ?? null,
-    rol,
-    tc: me?.tcNo ?? fallbackTc ?? null,
-    adSoyad: me?.adSoyad || "—",
-    cinsiyet: me?.cinsiyet || null,
-    kanGrubu: me?.kanGrubu || null,
-    telefon: me?.telefon || null,
-    adres: me?.adres || null,
-    dogumTarihi: me?.dogumTarihi || null,
-    unvan: me?.unvan || (rol === "BASHEKIM" ? "Başhekim" : null),
-    brans: me?.brans || me?.uzmanlikAlani || null,
-    uzmanlikAlani: me?.uzmanlikAlani || null,
-    poliklinikIsmi: me?.poliklinikIsmi || me?.poliklinik_adi || me?.uzmanlikAlani || null,
-    iseGirisTarihi: me?.iseGirisTarihi || me?.ise_giris_tarihi || null,
-    muayeneUcreti: me?.muayeneUcreti ?? null,
-    gorev: me?.gorev || null,
-    birimId: me?.birimId || me?.birim_id || null,
-    birimAdi: me?.birimAdi || me?.birim_adi || null,
-    poliklinikId: me?.poliklinikId || me?.poliklinik_id || null,
-    vardiya: me?.vardiya || null,
-    mesaiBaslangic: me?.mesaiBaslangic || me?.mesai_baslangic || null,
-    mesaiBitis: me?.mesaiBitis || me?.mesai_bitis || null,
-    durum: me?.durum || null,
-    gunlukGorevler: me?.gunlukGorevler || []
-  });
-
-  const tarihObjesiOlustur = (tarih) => new Date(`${tarih}T00:00:00`);
-
-  const tarihYMD = (date) => {
-    const yil = date.getFullYear();
-    const ay = String(date.getMonth() + 1).padStart(2, "0");
-    const gun = String(date.getDate()).padStart(2, "0");
-    return `${yil}-${ay}-${gun}`;
-  };
-
-  const haftaninBaslangici = (tarih) => {
-    const d = tarihObjesiOlustur(tarih);
-    const gun = d.getDay();
-    const fark = gun === 0 ? -6 : 1 - gun;
-    d.setDate(d.getDate() + fark);
-    return tarihYMD(d);
-  };
-
-  const haftaninBitisi = (tarih) => {
-    const baslangic = tarihObjesiOlustur(haftaninBaslangici(tarih));
-    baslangic.setDate(baslangic.getDate() + 6);
-    return tarihYMD(baslangic);
-  };
-
-  const ayinBaslangici = (tarih) => {
-    const d = tarihObjesiOlustur(tarih);
-    d.setDate(1);
-    return tarihYMD(d);
-  };
-
-  const ayinBitisi = (tarih) => {
-    const d = tarihObjesiOlustur(tarih);
-    d.setMonth(d.getMonth() + 1);
-    d.setDate(0);
-    return tarihYMD(d);
-  };
-
-  const tarihAraliktaMi = (tarih, baslangic, bitis) => {
-    return tarih >= baslangic && tarih <= bitis;
-  };
-
-  const slotSaatToplami = (slotlar) => slotlar.length * SLOT_SURESI_SAAT;
-
-  const tarihAraligiGetir = () => {
-    if (performansFiltreTipi === "gunluk") {
-      return {
-        baslangic: performansReferansTarihi,
-        bitis: performansReferansTarihi
-      };
-    }
-
-    if (performansFiltreTipi === "haftalik") {
-      return {
-        baslangic: haftaninBaslangici(performansReferansTarihi),
-        bitis: haftaninBitisi(performansReferansTarihi)
-      };
-    }
-
-    if (performansFiltreTipi === "aylik") {
-      return {
-        baslangic: ayinBaslangici(performansReferansTarihi),
-        bitis: ayinBitisi(performansReferansTarihi)
-      };
-    }
-
-    return {
-      baslangic: performansBaslangicTarihi,
-      bitis: performansBitisTarihi
-    };
-  };
-
-  const doktorunHedefSaati = (doktorId) => {
-    return Number(doktorHaftalikPlanlari[doktorId]?.hedefSaat || VARSAYILAN_HAFTALIK_HEDEF);
-  };
-
-  const doktorunHaftalikSlotlari = (doktorId, referansTarih) => {
-    const baslangic = haftaninBaslangici(referansTarih);
-    const bitis = haftaninBitisi(referansTarih);
-
-    return randevuSlotlari.filter(
-      slot =>
-        Number(slot.doktorId) === Number(doktorId) &&
-        tarihAraliktaMi(slot.tarih, baslangic, bitis)
+    return (
+      DOKTOR_LISTESI.find(
+        (d) => normalizeText(d.ad) === normalizeText(girisYapanKullanici.adSoyad)
+      ) ||
+      DOKTOR_LISTESI.find(
+        (d) =>
+          normalizeText(d.poliklinik) ===
+          normalizeText(
+            girisYapanKullanici.poliklinikIsmi || girisYapanKullanici.brans || ""
+          )
+      ) ||
+      null
     );
-  };
-
-  const sonrakiNobetTarihiBul = () => {
-    const bugun = tarihObjesiOlustur(bugunString);
-    bugun.setDate(bugun.getDate() + 1);
-    return tarihYMD(bugun);
-  };
-
-  // ─── useEffect'ler ────────────────────────────────────────────────────────────
-  // Sayfa yenilenince token varsa otomatik giriş
-  useEffect(() => {
-    const token = localStorage.getItem("token");
-
-    if (!token) {
-      setOtomatikGirisYukleniyor(false);
-      return;
-    }
-
-    const decodeToken = (t) => {
-      try {
-        return JSON.parse(atob(t.split('.')[1]));
-      } catch {
-        return null;
-      }
-    };
-
-    const payload = decodeToken(token);
-
-    if (!payload) {
-      localStorage.removeItem("token");
-      setOtomatikGirisYukleniyor(false);
-      return;
-    }
-
-    const rolEndpointleri = {
-      DOKTOR: "/doktorlar/me",
-      PERSONEL: "/personeller/me",
-      BASHEKIM: "/bashekim/me",
-      HASTA: "/hastalar/me",
-    };
-
-    const endpoint = rolEndpointleri[payload.rol] || "/hastalar/me";
-
-    fetch(`${BASE_URL}${endpoint}`, {
-      headers: { Authorization: `Bearer ${token}` }
-    })
-      .then(async (res) => {
-        if (!res.ok) {
-          localStorage.removeItem("token");
-          return null;
-        }
-        const raw = await res.json();
-        return parseApiPayload(raw);
-      })
-      .then((kisi) => {
-        console.log("AUTO /me:", kisi);
-        if (kisi) {
-          setGirisYapanKullanici(
-            buildKullaniciFromMe({
-              me: kisi,
-              rol: payload.rol,
-              fallbackId: payload.id || payload.sub,
-              fallbackTc: payload.tcNo
-            })
-          );
-        }
-      })
-      .catch((err) => {
-        console.error("AUTO LOGIN HATASI:", err);
-        localStorage.removeItem("token");
-      })
-      .finally(() => setOtomatikGirisYukleniyor(false));
-  }, []);
-
-  useEffect(() => {
-    if (girisYapanKullanici?.rol === "DOKTOR") {
-      setMuayeneUcretiInput(
-        girisYapanKullanici.muayeneUcreti != null
-          ? String(girisYapanKullanici.muayeneUcreti)
-          : ""
-      );
-    }
   }, [girisYapanKullanici]);
 
-  // localStorage sync
-  useEffect(() => { localStorage.setItem("hastane_randevular", JSON.stringify(randevuListesi)); }, [randevuListesi]);
-  useEffect(() => { localStorage.setItem("hastane_randevu_slotlari", JSON.stringify(randevuSlotlari)); }, [randevuSlotlari]);
-  useEffect(() => { localStorage.setItem("muayene_kayitlari", JSON.stringify(muayeneKayitlari)); }, [muayeneKayitlari]);
-  useEffect(() => { localStorage.setItem("tahlil_istekleri", JSON.stringify(tahlilIstekleri)); }, [tahlilIstekleri]);
-  useEffect(() => { localStorage.setItem("tahlil_sonuclari", JSON.stringify(tahlilSonuclari)); }, [tahlilSonuclari]);
-  useEffect(() => { localStorage.setItem("receteler", JSON.stringify(receteler)); }, [receteler]);
-  useEffect(() => { localStorage.setItem("doktor_haftalik_planlari", JSON.stringify(doktorHaftalikPlanlari)); }, [doktorHaftalikPlanlari]);
-  useEffect(() => { localStorage.setItem("bashekim_nobet_listesi", JSON.stringify(nobetListesi)); }, [nobetListesi]);
+  // ─── useMemo hesaplamalar ────────────────────────────────────────────────────
 
-  // Bekleme süresi geri sayımı
-  useEffect(() => {
-    let timer;
-    if (beklemeSuresi > 0) {
-      timer = setInterval(() => {
-        setBeklemeSuresi((prev) => {
-          if (prev <= 1) {
-            localStorage.removeItem("lock_until");
-            setHataMesaji("");
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-    }
-    return () => clearInterval(timer);
-  }, [beklemeSuresi]);
-
-  // ─── Doktor demo kaydı ────────────────────────────────────────────────────────
-  const aktifDoktorDemoKaydi = (() => {
-    if (!girisYapanKullanici || (girisYapanKullanici.rol !== "DOKTOR" && girisYapanKullanici.rol !== "BASHEKIM")) return null;
-
-    const isimdenBul = DOKTOR_LISTESI.find(
-      d => normalizeText(d.ad) === normalizeText(girisYapanKullanici.adSoyad)
-    );
-    if (isimdenBul) return isimdenBul;
-
-    return DOKTOR_LISTESI.find(
-      d => normalizeText(d.poliklinik) === normalizeText(girisYapanKullanici.poliklinikIsmi || girisYapanKullanici.brans || "")
-    ) || null;
-  })();
-
-  // ─── Randevu özeti ────────────────────────────────────────────────────────────
-  const seciliHastane = HASTANELER.find(h => String(h.id) === String(hastaRandevuAkisi.hastaneId));
-  const seciliDoktor = DOKTOR_LISTESI.find(d => String(d.id) === String(hastaRandevuAkisi.doktorId));
-  const seciliSlot = randevuSlotlari.find(s => String(s.id) === String(hastaRandevuAkisi.slotId));
-
-  const randevuOzeti = seciliHastane && seciliDoktor && seciliSlot
-    ? {
-        hastane: seciliHastane,
-        doktor: seciliDoktor,
-        slot: seciliSlot,
-        poliklinik: hastaRandevuAkisi.poliklinik
-      }
-    : null;
-
-  // ─── Slot sorgu fonksiyonları ─────────────────────────────────────────────────
-  const doktoraAitMusaitSlotlar = (doktorId, hastaneId = null, poliklinik = null) => {
-    return randevuSlotlari
-      .filter(slot =>
-        Number(slot.doktorId) === Number(doktorId) &&
-        slot.durum === "MUSAIT" &&
-        slot.tarih >= bugunString &&
-        (!hastaneId || Number(slot.hastaneId) === Number(hastaneId)) &&
-        (!poliklinik || slot.poliklinik === poliklinik)
-      )
-      .sort(slotSirala);
-  };
-
-  const doktoraAitIlkMusaitSlot = (doktorId, hastaneId = null, poliklinik = null) => {
-    const slotlar = doktoraAitMusaitSlotlar(doktorId, hastaneId, poliklinik);
-    return slotlar.length > 0 ? slotlar[0] : null;
-  };
-
-  const hastaneyeGoreUygunPoliklinikler = (hastaneId) => {
-    return [...new Set(
-      randevuSlotlari
-        .filter(slot => Number(slot.hastaneId) === Number(hastaneId) && slot.durum === "MUSAIT" && slot.tarih >= bugunString)
-        .map(slot => slot.poliklinik)
-    )].sort((a, b) => a.localeCompare(b, 'tr'));
-  };
-
-  const poliklinigeGoreUygunHastaneler = (poliklinik) => {
-    return HASTANELER.filter(hastane =>
-      randevuSlotlari.some(slot =>
-        Number(slot.hastaneId) === Number(hastane.id) &&
-        slot.poliklinik === poliklinik &&
-        slot.durum === "MUSAIT" &&
-        slot.tarih >= bugunString
-      )
-    );
-  };
-
-  const konumaGoreUygunHastaneler = (il) => {
-    return HASTANELER.filter(hastane =>
-      hastane.il === il &&
-      randevuSlotlari.some(slot =>
-        Number(slot.hastaneId) === Number(hastane.id) &&
-        slot.durum === "MUSAIT" &&
-        slot.tarih >= bugunString
-      )
-    );
-  };
-
-  const konumaGoreSiraliHastaneler = (il) => {
-    const uygunlar = konumaGoreUygunHastaneler(il);
-
-    if (typeof bulunanKonum.latitude !== "number" || typeof bulunanKonum.longitude !== "number") {
-      return uygunlar.map((hastane, index) => ({ ...hastane, mesafeKm: null, enYakinMi: index === 0 }));
-    }
-
-    const zenginlestirilmis = uygunlar.map(hastane => ({
-      ...hastane,
-      mesafeKm: hesaplaMesafeKm(bulunanKonum.latitude, bulunanKonum.longitude, hastane.lat, hastane.lon)
-    }));
-
-    const sirali = [...zenginlestirilmis].sort((a, b) => {
-      if (a.mesafeKm == null) return 1;
-      if (b.mesafeKm == null) return -1;
-      return a.mesafeKm - b.mesafeKm;
-    });
-
-    return sirali.map((h, index) => ({ ...h, enYakinMi: index === 0 }));
-  };
-
-  const hastaneVePoliklinigeGoreDoktorlar = (hastaneId, poliklinik) => {
-    return (DOKTOR_HAVUZU[poliklinik] || [])
-      .filter(doc =>
-        randevuSlotlari.some(slot =>
-          Number(slot.hastaneId) === Number(hastaneId) &&
-          Number(slot.doktorId) === Number(doc.id) &&
-          slot.poliklinik === poliklinik &&
-          slot.durum === "MUSAIT" &&
-          slot.tarih >= bugunString
+  const goruntulenecekRandevular = useMemo(
+    () =>
+      girisYapanKullanici?.rol === "DOKTOR" && aktifDoktorDemoKaydi
+        ? randevuListesi.filter(
+          (r) => Number(r.doktorId) === Number(aktifDoktorDemoKaydi.id)
         )
-      )
-      .map(doc => ({
-        ...doc,
-        uygunSlotSayisi: doktoraAitMusaitSlotlar(doc.id, hastaneId, poliklinik).length,
-        ilkMusaitSlot: doktoraAitIlkMusaitSlot(doc.id, hastaneId, poliklinik)
-      }));
-  };
+        : randevuListesi,
+    [girisYapanKullanici, aktifDoktorDemoKaydi, randevuListesi]
+  );
 
-  const doktoraVeHastaneyeGoreMusaitTarihler = (doktorId, hastaneId, poliklinik) => {
-    const slotlar = doktoraAitMusaitSlotlar(doktorId, hastaneId, poliklinik);
-    return [...new Set(slotlar.map(slot => slot.tarih))];
-  };
+  // 🔥 muayene komple eklendi
+  const hastaTahlilGorunumu = useMemo(
+    () => muayene.buildHastaTahlilGorunumu(girisYapanKullanici),
+    [girisYapanKullanici, muayene]
+  );
 
-  const doktoraVeHastaneyeGoreSaatler = (doktorId, hastaneId, poliklinik, secilenTarih) => {
-    if (!secilenTarih) return [];
-    return randevuSlotlari
-      .filter(slot =>
-        Number(slot.hastaneId) === Number(hastaneId) &&
-        Number(slot.doktorId) === Number(doktorId) &&
-        slot.poliklinik === poliklinik &&
-        slot.tarih === secilenTarih &&
-        slot.durum === "MUSAIT"
-      )
-      .sort(slotSirala);
-  };
+  // 🔥 aynı mantık
+  const doktorMuayeneSurecleri = useMemo(
+    () => muayene.buildDoktoraMuayeneSurecleri(aktifDoktorDemoKaydi),
+    [aktifDoktorDemoKaydi, muayene]
+  );
 
-  // ─── Aynı doktora tekrar randevu engeli ───────────────────────────────────────
-  const RANDEVU_BLOKAJ_GUN = 2;
-
-  const aktifSurecDurumlari = [
-    "ONAYLANDI", "HASTA_GELDI", "MUAYENEDE",
-    "TAHLIL_BEKLENIYOR", "TAHLIL_ISTENDI",
-    "SONUC_INCELENIYOR", "DOKTOR_INCELEDI", "RECETE_YAZILDI"
-  ];
-
-  const tarihFarkiGun = (tarih1, tarih2) => {
-    const d1 = new Date(`${tarih1}T00:00:00`);
-    const d2 = new Date(`${tarih2}T00:00:00`);
-    const farkMs = Math.abs(d2 - d1);
-    return Math.floor(farkMs / (1000 * 60 * 60 * 24));
-  };
-
-  const hastaninAyniDoktoraRandevuEngeli = (hastaId, doktorId, hedefTarih = null) => {
-    if (!hastaId || !doktorId) return null;
-
-    const ayniDoktorRandevulari = randevuListesi.filter(r =>
-      Number(r.hastaId) === Number(hastaId) &&
-      Number(r.doktorId) === Number(doktorId)
-    );
-
-    const aktifRandevu = ayniDoktorRandevulari.find(r => aktifSurecDurumlari.includes(r.durum));
-
-    if (aktifRandevu) {
+  // 🔥 useCallback şart
+  const tarihAraligiGetir = useCallback(() => {
+    if (performansFiltreTipi === "gunluk")
+      return { bas: performansReferansTarihi, bit: performansReferansTarihi };
+    if (performansFiltreTipi === "haftalik")
       return {
-        engelVar: true,
-        tip: "AKTIF_SUREC",
-        mesaj: `Bu doktorda aktif bir süreciniz var (${formatTarih(aktifRandevu.tarih)} ${aktifRandevu.saat}). Muayene tamamlanmadan yeni randevu alamazsınız.`
+        bas: haftaBaslangici(performansReferansTarihi),
+        bit: haftaBitisi(performansReferansTarihi),
       };
-    }
+    if (performansFiltreTipi === "aylik")
+      return {
+        bas: ayBaslangici(performansReferansTarihi),
+        bit: ayBitisi(performansReferansTarihi),
+      };
+    return { bas: performansBaslangic, bit: performansBitis };
+  }, [
+    performansFiltreTipi,
+    performansReferansTarihi,
+    performansBaslangic,
+    performansBitis,
+  ]);
 
-    const tamamlananRandevular = ayniDoktorRandevulari
-      .filter(r => r.durum === "TAMAMLANDI")
-      .sort((a, b) => new Date(`${b.tarih}T${b.saat}`) - new Date(`${a.tarih}T${a.saat}`));
+  // 🔥 takvim komple eklendi + function
+  const bashekimPerformanslar = useMemo(() => {
+    const { bas, bit } = tarihAraligiGetir();
 
-    if (tamamlananRandevular.length > 0) {
-      const sonTamamlanan = tamamlananRandevular[0];
-      const kontrolTarihi = hedefTarih || bugunString;
-      const gunFarki = tarihFarkiGun(sonTamamlanan.tarih, kontrolTarihi);
+    return DOKTOR_LISTESI.map((d) => {
+      const doktorRandevular = randevuListesi.filter(
+        (r) =>
+          Number(r.doktorId) === Number(d.id) &&
+          tarihAraliktaMi(r.tarih, bas, bit)
+      );
 
-      if (gunFarki < RANDEVU_BLOKAJ_GUN) {
-        return {
-          engelVar: true,
-          tip: "BEKLEME_SURESI",
-          mesaj: `Aynı doktordan tekrar randevu almak için en az ${RANDEVU_BLOKAJ_GUN} gün beklemelisiniz. Son tamamlanan muayeneniz: ${formatTarih(sonTamamlanan.tarih)}.`
-        };
-      }
-    }
+      const slotlar = randevuSlotlari.filter(
+        (s) =>
+          Number(s.doktorId) === Number(d.id) &&
+          tarihAraliktaMi(s.tarih, bas, bit)
+      );
 
-    return { engelVar: false, tip: null, mesaj: "" };
-  };
-
-  // ─── Randevu akış handler'ları ────────────────────────────────────────────────
-  const resetHastaRandevuAkisi = () => {
-    setHastaRandevuAkisi({ aramaTuru: "", il: "", poliklinik: "", hastaneId: "", doktorId: "", slotId: "" });
-    setRandevuAdimi("ana");
-    setSeciliIl("");
-    setSeciliPoliklinik("");
-    setAramaSonuclari([]);
-  };
-
-  const geriGitRandevuAkisi = () => {
-    if (randevuAdimi === "arama-turu") return setRandevuAdimi("ana");
-    if (randevuAdimi === "konum-sec") return setRandevuAdimi("arama-turu");
-    if (randevuAdimi === "hastane-sec") return setRandevuAdimi(hastaRandevuAkisi.aramaTuru === "konum" ? "konum-sec" : "poliklinik-sec");
-    if (randevuAdimi === "poliklinik-sec") return setRandevuAdimi(hastaRandevuAkisi.aramaTuru === "konum" ? "hastane-sec" : "arama-turu");
-    if (randevuAdimi === "doktor-sec") return setRandevuAdimi("poliklinik-sec");
-    if (randevuAdimi === "slot-sec") return setRandevuAdimi("doktor-sec");
-    if (randevuAdimi === "onay") return setRandevuAdimi("slot-sec");
-  };
-
-  const handleAramaTuruSec = (tur) => {
-    setHastaRandevuAkisi({
-      aramaTuru: tur,
-      il: tur === "konum" ? (bulunanKonum.il || seciliIl || "") : "",
-      poliklinik: "", hastaneId: "", doktorId: "", slotId: ""
-    });
-    setRandevuAdimi(tur === "konum" ? "konum-sec" : "poliklinik-sec");
-  };
-
-  const handleHastaIlSec = (il) => {
-    setSeciliIl(il);
-    setHastaRandevuAkisi(prev => ({ ...prev, il, hastaneId: "", poliklinik: "", doktorId: "", slotId: "" }));
-    setRandevuAdimi("hastane-sec");
-  };
-
-  const handleHastaPoliklinikSec = (poliklinik) => {
-    setSeciliPoliklinik(poliklinik);
-    setHastaRandevuAkisi(prev => ({ ...prev, poliklinik, doktorId: "", slotId: "" }));
-    setRandevuAdimi(hastaRandevuAkisi.aramaTuru === "poliklinik" ? "hastane-sec" : "doktor-sec");
-  };
-
-  const handleHastaHastaneSec = (hastaneId) => {
-    setHastaRandevuAkisi(prev => ({
-      ...prev,
-      hastaneId,
-      doktorId: "",
-      slotId: "",
-      ...(prev.aramaTuru === "konum" ? { poliklinik: "" } : {})
-    }));
-    setRandevuAdimi(hastaRandevuAkisi.aramaTuru === "konum" ? "poliklinik-sec" : "doktor-sec");
-  };
-
-  const handleHastaDoktorSec = (doktorId) => {
-    setHastaRandevuAkisi(prev => ({ ...prev, doktorId, slotId: "" }));
-    setRandevuAdimi("slot-sec");
-  };
-
-  const handleHastaSlotSec = (slotId) => {
-    const secilenSlot = randevuSlotlari.find(s => String(s.id) === String(slotId));
-    const hastaId = Number(girisYapanKullanici?.id);
-
-    if (!secilenSlot || !hastaId) {
-      alert("Slot bilgisi alınamadı.");
-      return;
-    }
-
-    const kontrol = hastaninAyniDoktoraRandevuEngeli(hastaId, secilenSlot.doktorId, secilenSlot.tarih);
-
-    if (kontrol?.engelVar) {
-      alert(kontrol.mesaj);
-      return;
-    }
-
-    setHastaRandevuAkisi(prev => ({ ...prev, slotId }));
-    setRandevuAdimi("onay");
-  };
-
-  // ─── Giriş ────────────────────────────────────────────────────────────────────
-  const handleGiris = async (e) => {
-    if (e) e.preventDefault();
-    setHataMesaji("");
-
-    try {
-      const response = await fetch(`${BASE_URL}/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tcNo, sifre })
+      const tamamlanan = muayene.muayeneKayitlari.filter((m) => {
+        const r = randevuListesi.find(
+          (r2) => String(r2.id) === String(m.randevuId)
+        );
+        return (
+          Number(m.doktorId) === Number(d.id) &&
+          r &&
+          tarihAraliktaMi(r.tarih, bas, bit) &&
+          m.durum === "TAMAMLANDI"
+        );
       });
 
-      const rawLogin = await response.json();
-      console.log("LOGIN RAW:", rawLogin);
+      const nobetler = takvim.nobetListesi.filter(
+        (n) =>
+          normalizeText(n.doktor) === normalizeText(d.ad) &&
+          tarihAraliktaMi(n.tarih, bas, bit)
+      );
 
-      const loginData = parseApiPayload(rawLogin);
-      const loginSuccess = rawLogin?.success ?? response.ok;
+      const toplam = takvim.slotSaatToplami(slotlar);
+      const hedef = takvim.doktorunHedefSaati(d.id);
 
-      const token = loginData?.token;
-      const rol = loginData?.rol;
-      const loginId = loginData?.id;
-      const loginTc = loginData?.tcNo || tcNo;
+      return {
+        doktorId: d.id,
+        doktor: d.ad,
+        unvan: d.unvan,
+        poliklinik: d.poliklinik,
+        hastaSayisi: doktorRandevular.length,
+        aktifSlotSayisi: slotlar.filter((s) => s.durum === "MUSAIT").length,
+        toplamSaat: toplam,
+        aktifGunSayisi: new Set(slotlar.map((s) => s.tarih)).size,
+        tamamlananMuayeneSayisi: tamamlanan.length,
+        nobetSayisi: nobetler.length,
+        dolulukOrani:
+          hedef > 0
+            ? Math.min(Math.round((toplam / hedef) * 100), 999)
+            : 0,
+        dolulukPuani:
+          doktorRandevular.length * 8 +
+          toplam * 2 +
+          tamamlanan.length * 5,
+      };
+    }).sort((a, b) => b.dolulukPuani - a.dolulukPuani);
+  }, [
+    randevuListesi,
+    randevuSlotlari,
+    muayene,
+    takvim,
+    tarihAraligiGetir,
+  ]);
 
-      if (loginSuccess && token && rol) {
-        setDenemeSayisi(0);
-        localStorage.setItem("token", token);
+  // ✅ doğru zaten
+  const poliklinikOzeti = useMemo(() => {
+    return Object.keys(DOKTOR_HAVUZU)
+      .map((pol) => {
+        const randevuSayisi = randevuListesi.filter(
+          (r) => r.poliklinik === pol
+        ).length;
+        const musaitSlot = randevuSlotlari.filter(
+          (s) => s.poliklinik === pol && s.durum === "MUSAIT"
+        ).length;
 
-        const endpoint =
-          rol === "DOKTOR" ? "/doktorlar/me" :
-          rol === "PERSONEL" ? "/personeller/me" :
-          rol === "BASHEKIM" ? "/bashekim/me" :
-          "/hastalar/me";
+        return {
+          poliklinik: pol,
+          randevuSayisi,
+          musaitSlot,
+          seviye:
+            randevuSayisi >= 5
+              ? "Yoğun"
+              : randevuSayisi >= 2
+                ? "Orta"
+                : "Düşük",
+        };
+      })
+      .filter((i) => i.randevuSayisi > 0 || i.musaitSlot > 0)
+      .sort((a, b) => b.randevuSayisi - a.randevuSayisi);
+  }, [randevuListesi, randevuSlotlari]);
 
-        const res = await fetch(`${BASE_URL}${endpoint}`, {
-          method: "GET",
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        });
+  // 🔥 bugunString eklendi
+  const sistemOzeti = useMemo(
+    () => ({
+      bugunkuRandevu: randevuListesi.filter(
+        (r) => r.tarih === bugunString
+      ).length,
+      acikSikayet: BASHEKIM_DEMO_SIKAYETLERI.filter(
+        (s) => s.durum === "Açık"
+      ).length,
+      aktifDoktorSayisi: new Set(
+        randevuSlotlari.map((s) => s.doktorId)
+      ).size,
+      toplamHekim: DOKTOR_LISTESI.length,
+      toplamHastaRandevu: randevuListesi.length,
+    }),
+    [randevuListesi, randevuSlotlari, bugunString]
+  );
 
-        if (res.ok) {
-          const rawMe = await res.json();
-          const kisi = parseApiPayload(rawMe);
-          console.log("LOGIN /me:", kisi);
-
-          setGirisYapanKullanici(
-            buildKullaniciFromMe({
-              me: kisi,
-              rol,
-              fallbackId: loginId,
-              fallbackTc: loginTc
-            })
-          );
-
-          setAktifSekme("Ana Sayfa");
-        } else {
-          setHataMesaji("Profil bilgileri alınamadı.");
-        }
-      } else {
-        const yeniDeneme = denemeSayisi + 1;
-        const kalanHak = MAX_DENEME - yeniDeneme;
-        setDenemeSayisi(yeniDeneme);
-
-        if (kalanHak > 0) {
-          setHataMesaji(`❌ Hatalı T.C. veya şifre. Kalan hak: ${kalanHak}`);
-        } else {
-          setHataMesaji("⛔ 3 kez hatalı giriş. 120 saniye bekleyiniz.");
-          localStorage.setItem("lock_until", (Date.now() + 120000).toString());
-          setBeklemeSuresi(120);
-          setDenemeSayisi(0);
-        }
-      }
-    } catch (err) {
-      console.error("LOGIN HATASI:", err);
-      setHataMesaji("Bağlantı hatası.");
-    }
-  };
-
+  // 🔥 takvim komple
+  const haftalikOzet = useMemo(
+    () => takvim.aktifDoktorHaftalikOzeti(aktifDoktorDemoKaydi),
+    [aktifDoktorDemoKaydi, takvim]
+  );
+  // ─── Muayene ücreti güncelle ─────────────────────────────────────────────────
   const handleMuayeneUcretiGuncelle = async () => {
-    if (girisYapanKullanici?.rol !== "DOKTOR") {
-      return alert("Sadece doktor ücret güncelleyebilir.");
-    }
-
-    const token = localStorage.getItem("token");
-    if (!token) {
-      return alert("Token bulunamadı. Lütfen tekrar giriş yapın.");
-    }
-
     const yeniUcret = Number(muayeneUcretiInput);
-
-    if (!muayeneUcretiInput || Number.isNaN(yeniUcret)) {
-      return alert("Lütfen geçerli bir muayene ücreti giriniz.");
-    }
-
-    if (yeniUcret < MIN_MUAYENE_UCRETI || yeniUcret > MAX_MUAYENE_UCRETI) {
+    if (!muayeneUcretiInput || Number.isNaN(yeniUcret)) return alert("Geçerli bir muayene ücreti giriniz.");
+    if (yeniUcret < MIN_MUAYENE_UCRETI || yeniUcret > MAX_MUAYENE_UCRETI)
       return alert(`Muayene ücreti ${MIN_MUAYENE_UCRETI} TL ile ${MAX_MUAYENE_UCRETI} TL arasında olmalıdır.`);
-    }
 
     try {
       setUcretGuncelleniyor(true);
-
-      const response = await fetch(`${BASE_URL}/doktorlar/ucret`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          muayeneUcreti: yeniUcret
-        })
-      });
-
-      const raw = await response.json().catch(() => ({}));
-      console.log("UCRET GUNCELLE RESPONSE:", raw);
-
-      if (!response.ok) {
-        return alert(raw?.message || "Muayene ücreti güncellenemedi.");
-      }
-
-      setGirisYapanKullanici(prev => ({
-        ...prev,
-        muayeneUcreti: yeniUcret
-      }));
-
+      const res = await apiMuayeneUcretiGuncelle(yeniUcret);
+      const raw = await res.json().catch(() => ({}));
+      if (!res.ok) return alert(raw?.message || "Muayene ücreti güncellenemedi.");
+      setGirisYapanKullanici((prev) => ({ ...prev, muayeneUcreti: yeniUcret }));
       alert("Muayene ücreti başarıyla güncellendi.");
-    } catch (error) {
-      console.error("UCRET GUNCELLEME HATASI:", error);
+    } catch {
       alert("Sunucu bağlantı hatası.");
     } finally {
       setUcretGuncelleniyor(false);
     }
   };
 
-  // ─── Kayıt ────────────────────────────────────────────────────────────────────
-  const yeniHastaEkle = async (yeniHastaVerisi) => {
-    setHataMesaji("");
-    const kayitPaketi = {
-      adSoyad: yeniHastaVerisi.adSoyad,
-      tcNo: yeniHastaVerisi.tcNo,
-      sifre: yeniHastaVerisi.sifre,
-      telefon: yeniHastaVerisi.telefon,
-      cinsiyet: yeniHastaVerisi.cinsiyet === "Erkek" ? "E" : "K",
-      kanGrubu: yeniHastaVerisi.kanGrubu,
-      adres: yeniHastaVerisi.adres,
-      dogumTarihi: yeniHastaVerisi.dogumTarihi,
-      rol: "HASTA"
-    };
-
-    try {
-      const response = await fetch(`${BASE_URL}/auth/register`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(kayitPaketi)
-      });
-
-      const responseText = await response.text();
-
-      if (response.ok) {
-        alert("✅ Kayıt Başarılı!");
-        setKayitModu(false);
-        setTcNo(yeniHastaVerisi.tcNo);
-      } else {
-        let hata = "Kayıt hatası.";
-        try { hata = JSON.parse(responseText).message || hata; } catch {}
-        setHataMesaji(`❌ ${hata}`);
-      }
-    } catch {
-      setHataMesaji("❌ Bağlantı hatası.");
-    }
-  };
-
-  // ─── Randevu al ───────────────────────────────────────────────────────────────
-  const handleRandevuAl = async () => {
-    if (!randevuOzeti) return alert("Randevu özeti oluşturulamadı.");
-
-    const token = localStorage.getItem("token");
-    const hastaId = Number(girisYapanKullanici?.id);
-
-    const ayniSlotDoluMu = randevuSlotlari.find(
-      slot => Number(slot.id) === Number(randevuOzeti.slot.id) && slot.durum !== "MUSAIT"
-    );
-    if (ayniSlotDoluMu) return alert("Bu slot artık uygun değil. Lütfen tekrar seçim yapınız.");
-
-    const doktorEngeli = hastaninAyniDoktoraRandevuEngeli(hastaId, Number(randevuOzeti.doktor.id), randevuOzeti.slot.tarih);
-    if (doktorEngeli?.engelVar) return alert(doktorEngeli.mesaj);
-
-    const randevuPaketi = {
-      doktorId: Number(randevuOzeti.doktor.id),
-      randevuTarihi: randevuOzeti.slot.tarih,
-      randevuSaati: `${randevuOzeti.slot.saat}:00`,
-      durum: "ONAYLANDI",
-      sikayet: "Sistem üzerinden randevu alındı."
-    };
-
-    try {
-      const response = await fetch(`${BASE_URL}/randevular`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(randevuPaketi)
-      });
-
-      if (response.ok) {
-        const yeniRandevu = {
-          id: `#${Date.now()}`,
-          hastaId,
-          poliklinik: randevuOzeti.poliklinik,
-          doktor: randevuOzeti.doktor.ad,
-          doktorId: randevuOzeti.doktor.id,
-          hastane: randevuOzeti.hastane.ad,
-          tarih: randevuOzeti.slot.tarih,
-          saat: randevuOzeti.slot.saat,
-          durum: "ONAYLANDI",
-          sikayet: "Sistem üzerinden randevu alındı."
-        };
-
-        setRandevuListesi(prev => [yeniRandevu, ...prev]);
-        setRandevuSlotlari(prev =>
-          prev.map(slot =>
-            Number(slot.id) === Number(randevuOzeti.slot.id)
-              ? { ...slot, durum: "DOLU" }
-              : slot
-          )
-        );
-
-        alert("✅ Randevunuz başarıyla oluşturuldu!");
-        resetHastaRandevuAkisi();
-        setAktifSekme("Randevularım");
-      } else {
-        const err = await response.json();
-        alert(`DB Reddi: ${err.message || "Eksik Veri"}`);
-      }
-    } catch {
-      alert("Sunucu bağlantı hatası!");
-    }
-  };
-
-  // ─── Konum tespiti ────────────────────────────────────────────────────────────
-  const konumuTespitEt = () => {
-    setKonumYukleniyor(true);
-
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(async (position) => {
-        try {
-          const { latitude, longitude } = position.coords;
-          const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`);
-          const data = await response.json();
-
-          const city = data.address.province || data.address.city || "Ankara";
-          const district = data.address.district || data.address.town || "Merkez";
-
-          setBulunanKonum({
-            il: city,
-            ilce: district,
-            detay: `${data.address.suburb || ""} ${data.address.road || ""}`.trim(),
-            latitude,
-            longitude
-          });
-
-          setSeciliIl(city);
-          setHastaRandevuAkisi(prev => ({
-            ...prev,
-            il: city,
-            hastaneId: "",
-            poliklinik: "",
-            doktorId: "",
-            slotId: ""
-          }));
-
-          setRandevuAdimi("hastane-sec");
-          setKonumYukleniyor(false);
-        } catch {
-          setKonumYukleniyor(false);
-          alert("Konum bilgisi alınırken hata oluştu.");
-        }
-      }, () => {
-        setKonumYukleniyor(false);
-        alert("Konum erişimi reddedildi.");
-      });
-    } else {
-      setKonumYukleniyor(false);
-      alert("Tarayıcı konum özelliğini desteklemiyor.");
-    }
-  };
-
-  // ─── Doktor takvim fonksiyonları ──────────────────────────────────────────────
-  const doktorSaatSeciminiDegistir = (saat) => {
-    setDoktorTakvimFormu(prev => {
-      const seciliMi = prev.seciliSaatler.includes(saat);
-      return {
-        ...prev,
-        seciliSaatler: seciliMi
-          ? prev.seciliSaatler.filter(item => item !== saat)
-          : [...prev.seciliSaatler, saat].sort((a, b) => new Date(`2000-01-01T${a}`) - new Date(`2000-01-01T${b}`))
-      };
-    });
-  };
-
-  const doktorTakvimeSlotEkle = () => {
-    if (!aktifDoktorDemoKaydi) return alert("Doktor kaydınız demo listesi ile eşleşmedi.");
-    if (!doktorTakvimFormu.hastaneId || !doktorTakvimFormu.tarih || doktorTakvimFormu.seciliSaatler.length === 0) {
-      return alert("Lütfen hastane, tarih ve en az bir saat seçiniz.");
-    }
-
-    const hedefSaat = doktorunHedefSaati(aktifDoktorDemoKaydi.id);
-    const haftalikSlotlar = doktorunHaftalikSlotlari(aktifDoktorDemoKaydi.id, doktorTakvimFormu.tarih);
-    const mevcutHaftalikSaat = slotSaatToplami(haftalikSlotlar);
-
-    const mevcutSaatler = randevuSlotlari
-      .filter(slot =>
-        Number(slot.hastaneId) === Number(doktorTakvimFormu.hastaneId) &&
-        Number(slot.doktorId) === Number(aktifDoktorDemoKaydi.id) &&
-        slot.tarih === doktorTakvimFormu.tarih
-      )
-      .map(slot => slot.saat);
-
-    const yeniSaatler = doktorTakvimFormu.seciliSaatler.filter(saat => !mevcutSaatler.includes(saat));
-
-    if (yeniSaatler.length === 0) {
-      return alert("Seçtiğiniz saatlerin tamamı zaten eklenmiş.");
-    }
-
-    const yeniToplamSaat = mevcutHaftalikSaat + (yeniSaatler.length * SLOT_SURESI_SAAT);
-
-    if (yeniToplamSaat > MAX_HAFTALIK_CALISMA_SAATI) {
-      return alert(`Bu ekleme haftalık sınırı aşar. Mevcut: ${mevcutHaftalikSaat} saat, eklenmek istenen: ${yeniSaatler.length} saat, üst sınır: ${MAX_HAFTALIK_CALISMA_SAATI} saat.`);
-    }
-
-    const yeniSlotlar = yeniSaatler.map((saat, index) => ({
-      id: Date.now() + index,
-      hastaneId: Number(doktorTakvimFormu.hastaneId),
-      doktorId: Number(aktifDoktorDemoKaydi.id),
-      poliklinik: aktifDoktorDemoKaydi.poliklinik,
-      tarih: doktorTakvimFormu.tarih,
-      saat,
-      durum: "MUSAIT"
-    }));
-
-    setRandevuSlotlari(prev => [...prev, ...yeniSlotlar].sort(slotSirala));
-
-    const eklenemeyenSaatler = doktorTakvimFormu.seciliSaatler.filter(saat => mevcutSaatler.includes(saat));
-    setDoktorTakvimFormu(prev => ({ ...prev, seciliSaatler: [] }));
-
-    const yeniSaatMesaji = `${yeniSaatler.length} slot başarıyla eklendi.`;
-    const hedefDurumMesaji = yeniToplamSaat < hedefSaat
-      ? `Haftalık hedef için kalan: ${hedefSaat - yeniToplamSaat} saat.`
-      : `Haftalık hedef tamamlandı.`;
-
-    if (eklenemeyenSaatler.length > 0) {
-      alert(`✅ ${yeniSaatMesaji}\n⚠️ Zaten kayıtlı: ${eklenemeyenSaatler.join(", ")}\n📌 ${hedefDurumMesaji}`);
-    } else {
-      alert(`✅ ${yeniSaatMesaji}\n📌 ${hedefDurumMesaji}`);
-    }
-  };
-
-  const doktorSlotSil = (slotId) => {
-    setRandevuSlotlari(prev => prev.filter(slot => Number(slot.id) !== Number(slotId)));
-  };
-
-  const doktorHaftalikHedefGuncelle = (doktorId, hedefSaat) => {
-    const saat = Number(hedefSaat);
-
-    if (Number.isNaN(saat)) {
-      alert("Geçerli bir saat giriniz.");
-      return;
-    }
-
-    if (saat < MIN_HAFTALIK_CALISMA_SAATI || saat > MAX_HAFTALIK_CALISMA_SAATI) {
-      alert(`Haftalık hedef saat ${MIN_HAFTALIK_CALISMA_SAATI}-${MAX_HAFTALIK_CALISMA_SAATI} arasında olmalıdır.`);
-      return;
-    }
-
-    setDoktorHaftalikPlanlari(prev => ({
-      ...prev,
-      [doktorId]: {
-        ...(prev[doktorId] || {}),
-        hedefSaat: saat
-      }
-    }));
-
-    alert("Haftalık hedef saat kaydedildi.");
-  };
-
-  const doktoraNobetAta = (doktor) => {
-    const yeniNobet = {
-      id: `NOB-${Date.now()}`,
-      doktor: doktor.doktor || doktor.ad,
-      poliklinik: doktor.poliklinik,
-      tarih: sonrakiNobetTarihiBul(),
-      saat: "20:00 - 08:00",
-      durum: "Onaylı"
-    };
-
-    setNobetListesi(prev => [yeniNobet, ...prev]);
-    alert(`${doktor.doktor || doktor.ad} için nöbet eklendi.`);
-  };
-
-  const otomatikNobetOnerisiOlustur = () => {
-    const eksikDoktorlar = DOKTOR_LISTESI.map(doktor => {
-      const haftalikSlotlar = doktorunHaftalikSlotlari(doktor.id, bugunString);
-      const toplamSaat = slotSaatToplami(haftalikSlotlar);
-      const hedefSaat = doktorunHedefSaati(doktor.id);
-      const eksikSaat = Math.max(hedefSaat - toplamSaat, 0);
-
-      return {
-        doktorId: doktor.id,
-        doktor: doktor.ad,
-        poliklinik: doktor.poliklinik,
-        eksikSaat
-      };
-    })
-      .filter(item => item.eksikSaat > 0)
-      .sort((a, b) => b.eksikSaat - a.eksikSaat)
-      .slice(0, 5);
-
-    if (eksikDoktorlar.length === 0) {
-      alert("Bu hafta eksik saatli doktor bulunmuyor.");
-      return;
-    }
-
-    const baslangicTarihi = tarihObjesiOlustur(sonrakiNobetTarihiBul());
-
-    const oneriler = eksikDoktorlar.map((doktor, index) => {
-      const tarih = new Date(baslangicTarihi);
-      tarih.setDate(baslangicTarihi.getDate() + index);
-
-      return {
-        id: `NOB-${Date.now()}-${index}`,
-        doktor: doktor.doktor,
-        poliklinik: doktor.poliklinik,
-        tarih: tarihYMD(tarih),
-        saat: "20:00 - 08:00",
-        durum: "Onaylı"
-      };
-    });
-
-    setNobetListesi(prev => [...oneriler, ...prev]);
-    alert("Eksik saatli doktorlara göre otomatik nöbet listesi oluşturuldu.");
-  };
-
-  // ─── Muayene akış fonksiyonları ───────────────────────────────────────────────
-  const hastaGeldiIsaretle = (randevuId) => {
-    setRandevuListesi(prev => prev.map(r => String(r.id) === String(randevuId) ? { ...r, durum: "HASTA_GELDI" } : r));
-  };
-
-  const muayeneBaslat = (randevu) => {
-    const mevcutMuayene = muayeneKayitlari.find(m => String(m.randevuId) === String(randevu.id));
-    if (mevcutMuayene) {
-      setRandevuListesi(prev => prev.map(item => String(item.id) === String(randevu.id) ? { ...item, durum: "MUAYENEDE" } : item));
-      return;
-    }
-
-    const yeniMuayene = {
-      id: `MUA-${Date.now()}`,
-      randevuId: randevu.id,
-      hastaId: Number(randevu.hastaId || 1),
-      doktorId: Number(randevu.doktorId),
-      poliklinik: randevu.poliklinik,
-      baslangicZamani: new Date().toISOString(),
-      bitisZamani: null,
-      sikayet: randevu.sikayet || "Muayene sırasında değerlendirilecek.",
-      onTani: "Ön değerlendirme aşamasında",
-      doktorNotu: "Muayene başlatıldı.",
-      durum: "MUAYENEDE"
-    };
-
-    setMuayeneKayitlari(prev => [yeniMuayene, ...prev]);
-    setRandevuListesi(prev => prev.map(item => String(item.id) === String(randevu.id) ? { ...item, durum: "MUAYENEDE" } : item));
-  };
-
-  const tahlilIste = (randevu) => {
-    const muayene = muayeneKayitlari.find(m => String(m.randevuId) === String(randevu.id));
-    if (!muayene) return alert("Önce muayeneyi başlatmalısınız.");
-
-    const mevcutTahliller = tahlilIstekleri.filter(t => String(t.muayeneId) === String(muayene.id));
-    if (mevcutTahliller.length > 0) return alert("Bu muayene için tahlil zaten istenmiş.");
-
-    const tetkikler = TETKIK_SABLONLARI[randevu.poliklinik] || ["Hemogram"];
-    const yeniTahliller = tetkikler.map((tetkik, index) => ({
-      id: `TAH-${Date.now()}-${index}`,
-      muayeneId: muayene.id,
-      hastaId: muayene.hastaId,
-      doktorId: muayene.doktorId,
-      tahlilTuru: tetkik,
-      istekTarihi: bugunString,
-      durum: "ISTENDI"
-    }));
-
-    setTahlilIstekleri(prev => [...yeniTahliller, ...prev]);
-    setMuayeneKayitlari(prev => prev.map(item =>
-      String(item.id) === String(muayene.id)
-        ? {
-            ...item,
-            onTani: item.onTani === "Ön değerlendirme aşamasında" ? "Tetkik planlandı" : item.onTani,
-            doktorNotu: `${item.doktorNotu} ${tetkikler.join(", ")} istendi.`,
-            durum: "TAHLIL_ISTENDI"
-          }
-        : item
-    ));
-    setRandevuListesi(prev => prev.map(item => String(item.id) === String(randevu.id) ? { ...item, durum: "TAHLIL_BEKLENIYOR" } : item));
-  };
-
-  const numuneVerildiIsaretle = (muayeneId) => {
-    setTahlilIstekleri(prev => prev.map(item => String(item.muayeneId) === String(muayeneId) ? { ...item, durum: "LABORATUVARDA" } : item));
-    setMuayeneKayitlari(prev => prev.map(item => String(item.id) === String(muayeneId) ? { ...item, durum: "TAHLIL_BEKLENIYOR" } : item));
-  };
-
-  const ornekSonucUret = (tahlilTuru) => {
-    const bank = {
-      "Hemogram": {
-        sonucOzeti: "Hemoglobin değeri düşük bulundu.",
-        referansDurumu: "REFERANS_DISI",
-        sonucDetaylari: [{ parametre: "Hemoglobin", deger: "10.8", birim: "g/dL", referans: "12 - 16", durum: "Düşük" }]
-      },
-      "Biyokimya": {
-        sonucOzeti: "Biyokimya değerleri genel olarak normal.",
-        referansDurumu: "NORMAL",
-        sonucDetaylari: [{ parametre: "Glukoz", deger: "92", birim: "mg/dL", referans: "70 - 100", durum: "Normal" }]
-      },
-      "CRP": {
-        sonucOzeti: "CRP hafif yüksek bulundu.",
-        referansDurumu: "REFERANS_DISI",
-        sonucDetaylari: [{ parametre: "CRP", deger: "8.2", birim: "mg/L", referans: "0 - 5", durum: "Yüksek" }]
-      },
-      "B12 Vitamini": {
-        sonucOzeti: "B12 vitamini düşük bulundu.",
-        referansDurumu: "REFERANS_DISI",
-        sonucDetaylari: [{ parametre: "B12", deger: "180", birim: "pg/mL", referans: "200 - 900", durum: "Düşük" }]
-      },
-    };
-
-    return bank[tahlilTuru] || {
-      sonucOzeti: `${tahlilTuru} sonucu değerlendirildi.`,
-      referansDurumu: "NORMAL",
-      sonucDetaylari: [{ parametre: tahlilTuru, deger: "Normal", birim: "-", referans: "-", durum: "Normal" }]
-    };
-  };
-
-  const tahlilSonucuHazirla = (muayeneId) => {
-    const hedefTahliller = tahlilIstekleri.filter(t => String(t.muayeneId) === String(muayeneId));
-    if (hedefTahliller.length === 0) return alert("Bu muayene için tahlil bulunamadı.");
-
-    const yeniSonuclar = hedefTahliller
-      .filter(t => !tahlilSonuclari.some(s => String(s.tahlilId) === String(t.id)))
-      .map((tahlil, index) => {
-        const demoSonuc = ornekSonucUret(tahlil.tahlilTuru);
-        return {
-          id: `SON-${Date.now()}-${index}`,
-          tahlilId: tahlil.id,
-          muayeneId,
-          sonucTarihi: bugunString,
-          ...demoSonuc
-        };
-      });
-
-    if (yeniSonuclar.length === 0) return alert("Sonuçlar zaten oluşturulmuş.");
-
-    setTahlilSonuclari(prev => [...yeniSonuclar, ...prev]);
-    setTahlilIstekleri(prev => prev.map(item => String(item.muayeneId) === String(muayeneId) ? { ...item, durum: "SONUCLANDI" } : item));
-    setMuayeneKayitlari(prev => prev.map(item => String(item.id) === String(muayeneId) ? { ...item, durum: "SONUC_INCELENIYOR" } : item));
-  };
-
-  const sonucuIncele = (muayeneId) => {
-    setTahlilIstekleri(prev => prev.map(item => String(item.muayeneId) === String(muayeneId) ? { ...item, durum: "DOKTOR_INCELEDI" } : item));
-    setMuayeneKayitlari(prev => prev.map(item =>
-      String(item.id) === String(muayeneId)
-        ? { ...item, doktorNotu: `${item.doktorNotu} Sonuçlar doktor tarafından değerlendirildi.`, durum: "DOKTOR_INCELEDI" }
-        : item
-    ));
-  };
-
-  const receteYaz = (muayeneId, poliklinik) => {
-    const mevcutRecete = receteler.find(r => String(r.muayeneId) === String(muayeneId));
-    if (mevcutRecete) return alert("Bu muayene için reçete zaten yazılmış.");
-
-    const ilaclar =
-      poliklinik === "Dahiliye (İç Hastalıkları)"
-        ? [
-            { ilacAdi: "Demir İlacı", kullanim: "Günde 1 kez tok karnına", sure: "30 gün" },
-            { ilacAdi: "B12 Vitamini", kullanim: "Günde 1 kez", sure: "14 gün" }
-          ]
-        : poliklinik === "Kardiyoloji"
-        ? [{ ilacAdi: "Kalp Destek İlacı", kullanim: "Sabah 1 tablet", sure: "30 gün" }]
-        : [{ ilacAdi: "Genel Destek İlacı", kullanim: "Günde 1 kez", sure: "7 gün" }];
-
-    const muayene = muayeneKayitlari.find(m => String(m.id) === String(muayeneId));
-    if (!muayene) return;
-
-    setReceteler(prev => [
-      {
-        id: `REC-${Date.now()}`,
-        muayeneId,
-        hastaId: muayene.hastaId,
-        doktorId: muayene.doktorId,
-        receteTarihi: bugunString,
-        ilaclar,
-        doktorNotu: "Tahlil sonucu sonrası reçete oluşturuldu."
-      },
-      ...prev
-    ]);
-
-    setMuayeneKayitlari(prev => prev.map(item => String(item.id) === String(muayeneId) ? { ...item, durum: "RECETE_YAZILDI" } : item));
-  };
-
-  const muayeneTamamla = (randevuId, muayeneId) => {
-    setMuayeneKayitlari(prev => prev.map(item => String(item.id) === String(muayeneId) ? { ...item, bitisZamani: new Date().toISOString(), durum: "TAMAMLANDI" } : item));
-    setRandevuListesi(prev => prev.map(item => String(item.id) === String(randevuId) ? { ...item, durum: "TAMAMLANDI" } : item));
-  };
-
-  // ─── useMemo hesaplamalar ─────────────────────────────────────────────────────
-  const goruntulenecekRandevular = girisYapanKullanici?.rol === "DOKTOR" && aktifDoktorDemoKaydi
-    ? randevuListesi.filter(r => Number(r.doktorId) === Number(aktifDoktorDemoKaydi.id))
-    : randevuListesi;
-
-  const hastayaAitTahlilGorunumu = useMemo(() => {
-    if (!girisYapanKullanici || girisYapanKullanici.rol !== "HASTA") return [];
-
-    const hastaId = Number(girisYapanKullanici.id);
-    const ilgiliMuayeneler = muayeneKayitlari.filter(m => Number(m.hastaId) === hastaId);
-    const satirlar = [];
-
-    ilgiliMuayeneler.forEach(muayene => {
-      const randevu = randevuListesi.find(r => String(r.id) === String(muayene.randevuId));
-      const doktorKaydi = DOKTOR_LISTESI.find(d => Number(d.id) === Number(muayene.doktorId));
-      const muayeneyeAitTahliller = tahlilIstekleri.filter(t => String(t.muayeneId) === String(muayene.id));
-
-      muayeneyeAitTahliller.forEach(tahlil => {
-        const sonuc = tahlilSonuclari.find(s => String(s.tahlilId) === String(tahlil.id));
-        const recete = receteler.find(r => String(r.muayeneId) === String(muayene.id));
-
-        satirlar.push({
-          muayeneTarihi: randevu ? formatTarih(randevu.tarih) : "—",
-          poliklinik: randevu?.poliklinik || muayene.poliklinik || "—",
-          doktor: doktorKaydi?.ad || randevu?.doktor || "—",
-          tahlilTuru: tahlil.tahlilTuru,
-          sonucOzeti: sonuc?.sonucOzeti || "Sonuç bekleniyor",
-          sonucTarihi: sonuc?.sonucTarihi ? formatTarih(sonuc.sonucTarihi) : "—",
-          receteDurumu: recete ? "Reçete yazıldı" : "Henüz yazılmadı",
-          durum: tahlil.durum
-        });
-      });
-    });
-
-    return satirlar.sort((a, b) => a.muayeneTarihi.localeCompare(b.muayeneTarihi)).reverse();
-  }, [girisYapanKullanici, muayeneKayitlari, tahlilIstekleri, tahlilSonuclari, receteler, randevuListesi]);
-
-  const doktoraAitMuayeneSurecleri = useMemo(() => {
-    if (!girisYapanKullanici || girisYapanKullanici.rol !== "DOKTOR" || !aktifDoktorDemoKaydi) return [];
-
-    const doktorId = Number(aktifDoktorDemoKaydi.id);
-
-    return randevuListesi
-      .filter(r => Number(r.doktorId) === doktorId)
-      .map(randevu => {
-        const muayene = muayeneKayitlari.find(m => String(m.randevuId) === String(randevu.id));
-        const muayeneyeAitTahliller = muayene ? tahlilIstekleri.filter(t => String(t.muayeneId) === String(muayene.id)) : [];
-        const muayeneyeAitSonuclar = muayene ? tahlilSonuclari.filter(s => String(s.muayeneId) === String(muayene.id)) : [];
-        const recete = muayene ? receteler.find(rec => String(rec.muayeneId) === String(muayene.id)) : null;
-        return { ...randevu, muayene, tahliller: muayeneyeAitTahliller, sonuclar: muayeneyeAitSonuclar, recete };
-      })
-      .sort((a, b) => new Date(`${b.tarih}T${b.saat}`) - new Date(`${a.tarih}T${a.saat}`));
-  }, [girisYapanKullanici, aktifDoktorDemoKaydi, randevuListesi, muayeneKayitlari, tahlilIstekleri, tahlilSonuclari, receteler]);
-
-  const bashekimCalismaOzeti = useMemo(() => {
-    return DOKTOR_LISTESI.map(doktor => {
-      const haftalikSlotlar = doktorunHaftalikSlotlari(doktor.id, bugunString);
-      const toplamSaat = slotSaatToplami(haftalikSlotlar);
-      const hedefSaat = doktorunHedefSaati(doktor.id);
-      const eksikSaat = Math.max(hedefSaat - toplamSaat, 0);
-      const durum =
-        toplamSaat < hedefSaat ? "Eksik" :
-        toplamSaat <= MAX_HAFTALIK_CALISMA_SAATI ? "Yeterli" :
-        "Fazla";
-
-      return {
-        doktorId: doktor.id,
-        doktor: doktor.ad,
-        unvan: doktor.unvan,
-        poliklinik: doktor.poliklinik,
-        hedefSaat,
-        toplamSaat,
-        eksikSaat,
-        durum
-      };
-    }).sort((a, b) => b.eksikSaat - a.eksikSaat);
-  }, [randevuSlotlari, doktorHaftalikPlanlari, bugunString]);
-
-  const bashekimDoktorPerformanslari = useMemo(() => {
-    const { baslangic, bitis } = tarihAraligiGetir();
-
-    return DOKTOR_LISTESI.map(doktor => {
-      const doktorRandevulari = randevuListesi.filter(
-        r =>
-          Number(r.doktorId) === Number(doktor.id) &&
-          tarihAraliktaMi(r.tarih, baslangic, bitis)
-      );
-
-      const ilgiliSlotlar = randevuSlotlari.filter(
-        s =>
-          Number(s.doktorId) === Number(doktor.id) &&
-          tarihAraliktaMi(s.tarih, baslangic, bitis)
-      );
-
-      const tamamlananMuayeneler = muayeneKayitlari.filter(m => {
-        const randevu = randevuListesi.find(r => String(r.id) === String(m.randevuId));
-        return (
-          Number(m.doktorId) === Number(doktor.id) &&
-          randevu &&
-          tarihAraliktaMi(randevu.tarih, baslangic, bitis) &&
-          m.durum === "TAMAMLANDI"
-        );
-      });
-
-      const doktorNobetleri = nobetListesi.filter(
-        n =>
-          normalizeText(n.doktor) === normalizeText(doktor.ad) &&
-          tarihAraliktaMi(n.tarih, baslangic, bitis)
-      );
-
-      const aktifGunSayisi = new Set(ilgiliSlotlar.map(s => s.tarih)).size;
-      const toplamSaat = slotSaatToplami(ilgiliSlotlar);
-      const hedefSaat = doktorunHedefSaati(doktor.id);
-      const dolulukOrani = hedefSaat > 0 ? Math.min(Math.round((toplamSaat / hedefSaat) * 100), 999) : 0;
-
-      return {
-        doktorId: doktor.id,
-        doktor: doktor.ad,
-        unvan: doktor.unvan,
-        poliklinik: doktor.poliklinik,
-        hastaSayisi: doktorRandevulari.length,
-        aktifSlotSayisi: ilgiliSlotlar.filter(s => s.durum === "MUSAIT").length,
-        toplamSaat,
-        aktifGunSayisi,
-        tamamlananMuayeneSayisi: tamamlananMuayeneler.length,
-        nobetSayisi: doktorNobetleri.length,
-        dolulukOrani,
-        dolulukPuani: (doktorRandevulari.length * 8) + (toplamSaat * 2) + (tamamlananMuayeneler.length * 5)
-      };
-    }).sort((a, b) => b.dolulukPuani - a.dolulukPuani);
-  }, [
-    randevuListesi,
-    randevuSlotlari,
-    muayeneKayitlari,
-    nobetListesi,
-    performansFiltreTipi,
-    performansReferansTarihi,
-    performansBaslangicTarihi,
-    performansBitisTarihi,
-    doktorHaftalikPlanlari
-  ]);
-
-  const poliklinikYogunlukOzeti = useMemo(() => {
-    const POLIKLINIKLER = Object.keys(DOKTOR_HAVUZU);
-
-    return POLIKLINIKLER.map(poliklinik => {
-      const randevuSayisi = randevuListesi.filter(r => r.poliklinik === poliklinik).length;
-      const musaitSlot = randevuSlotlari.filter(s => s.poliklinik === poliklinik && s.durum === "MUSAIT").length;
-
-      return {
-        poliklinik,
-        randevuSayisi,
-        musaitSlot,
-        seviye: randevuSayisi >= 5 ? "Yoğun" : randevuSayisi >= 2 ? "Orta" : "Düşük"
-      };
-    })
-      .filter(item => item.randevuSayisi > 0 || item.musaitSlot > 0)
-      .sort((a, b) => b.randevuSayisi - a.randevuSayisi);
-  }, [randevuListesi, randevuSlotlari]);
-
-  const bugunkuSistemOzeti = useMemo(() => {
-    const bugunkuRandevular = randevuListesi.filter(r => r.tarih === bugunString);
-    const acikSikayet = BASHEKIM_DEMO_SIKAYETLERI.filter(s => s.durum === "Açık").length;
-    const aktifDoktorSayisi = new Set(randevuSlotlari.map(s => s.doktorId)).size;
-
-    return {
-      bugunkuRandevu: bugunkuRandevular.length,
-      acikSikayet,
-      aktifDoktorSayisi,
-      toplamHekim: DOKTOR_LISTESI.length,
-      toplamHastaRandevu: randevuListesi.length
-    };
-  }, [randevuListesi, randevuSlotlari, bugunString]);
-
-  const aktifDoktorHaftalikOzeti = useMemo(() => {
-    if (!aktifDoktorDemoKaydi) return null;
-
-    const referansTarih = doktorTakvimFormu.tarih || bugunString;
-    const haftalikSlotlar = doktorunHaftalikSlotlari(aktifDoktorDemoKaydi.id, referansTarih);
-    const mevcutSaat = slotSaatToplami(haftalikSlotlar);
-    const hedefSaat = doktorunHedefSaati(aktifDoktorDemoKaydi.id);
-    const seciliEkSaat = (doktorTakvimFormu.seciliSaatler?.length || 0) * SLOT_SURESI_SAAT;
-    const eklenecekSonrasiSaat = mevcutSaat + seciliEkSaat;
-
-    return {
-      referansTarih,
-      haftaBaslangic: haftaninBaslangici(referansTarih),
-      haftaBitis: haftaninBitisi(referansTarih),
-      hedefSaat,
-      mevcutSaat,
-      seciliEkSaat,
-      eklenecekSonrasiSaat,
-      kalanSaat: Math.max(hedefSaat - mevcutSaat, 0),
-      eksikMi: mevcutSaat < hedefSaat,
-      yeterliMi: mevcutSaat >= hedefSaat && mevcutSaat <= MAX_HAFTALIK_CALISMA_SAATI,
-      fazlaMi: mevcutSaat > MAX_HAFTALIK_CALISMA_SAATI
-    };
-  }, [aktifDoktorDemoKaydi, doktorTakvimFormu, randevuSlotlari, bugunString, doktorHaftalikPlanlari]);
-
-  // ─── Render fonksiyonları ─────────────────────────────────────────────────────
-  const renderBashekimDashboard = () => (
-    <div className="table-container">
-      <div className="mhrs-banner" style={{ marginBottom: '16px' }}>Hoş Geldiniz Başhekim {girisYapanKullanici?.adSoyad}</div>
-      <div className="mhrs-action-grid" style={{ marginBottom: '20px' }}>
-        <div className="mhrs-secondary-panel"><h3>Bugünkü Randevular</h3><p>{bugunkuSistemOzeti.bugunkuRandevu} adet</p></div>
-        <div className="mhrs-secondary-panel"><h3>Açık Şikayet</h3><p>{bugunkuSistemOzeti.acikSikayet} adet</p></div>
-        <div className="mhrs-secondary-panel"><h3>Aktif Doktor</h3><p>{bugunkuSistemOzeti.aktifDoktorSayisi} kişi</p></div>
-        <div className="mhrs-secondary-panel"><h3>Toplam Randevu</h3><p>{bugunkuSistemOzeti.toplamHastaRandevu} kayıt</p></div>
-      </div>
-      <div className="mhrs-choice-grid" style={{ marginBottom: '20px' }}>
-        <button className="mhrs-choice-card poliklinik" onClick={() => setAktifSekme("Başhekim Profili")}><span className="mhrs-choice-icon">👤</span><span>Başhekim Profili</span></button>
-        <button className="mhrs-choice-card konum" onClick={() => setAktifSekme("Şikayet/Öneri Yönetimi")}><span className="mhrs-choice-icon">📝</span><span>Şikayet / Öneri</span></button>
-        <button className="mhrs-choice-card poliklinik" onClick={() => setAktifSekme("Nöbet ve Çalışma Çizelgesi")}><span className="mhrs-choice-icon">🗓️</span><span>Nöbet Çizelgesi</span></button>
-        <button className="mhrs-choice-card konum" onClick={() => setAktifSekme("Performans Analizi")}><span className="mhrs-choice-icon">📊</span><span>Performans Analizi</span></button>
-      </div>
-      <div className="table-header" style={{ marginBottom: '14px' }}>
-        <h3>Hızlı Yönetim Özeti</h3>
-        <p style={{ color: '#64748b', marginTop: '6px' }}>Doktor yoğunluğu, poliklinik doluluğu ve hasta geri bildirimlerini tek ekrandan takip edin.</p>
-      </div>
-      <table className="modern-table">
-        <thead><tr><th>Doktor</th><th>Poliklinik</th><th>Hasta Sayısı</th><th>Aktif Slot</th></tr></thead>
-        <tbody>
-          {bashekimDoktorPerformanslari.slice(0, 6).map(item => (
-            <tr key={item.doktorId}><td>{item.doktor}</td><td>{item.poliklinik}</td><td>{item.hastaSayisi}</td><td>{item.aktifSlotSayisi}</td></tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-
-  const renderBashekimSikayetleri = () => (
-    <div className="table-container">
-      <div className="table-header" style={{ marginBottom: '20px' }}>
-        <h3>📝 Hasta Şikayet ve Önerileri</h3>
-        <p style={{ color: '#64748b', marginTop: '8px' }}>Başhekim panelinde hasta geri bildirimlerini görüntüleyebilir ve süreçleri takip edebilirsiniz.</p>
-      </div>
-      <table className="modern-table">
-        <thead><tr><th>Hasta</th><th>Konu</th><th>Birim</th><th>Tarih</th><th>Durum</th><th>Mesaj</th></tr></thead>
-        <tbody>
-          {BASHEKIM_DEMO_SIKAYETLERI.map(item => (
-            <tr key={item.id}>
-              <td>{item.hasta}</td>
-              <td>{item.konu}</td>
-              <td>{item.birim}</td>
-              <td>{formatTarih(item.tarih)}</td>
-              <td><span className={`status-badge ${item.durum === "Çözüldü" ? "status-active" : item.durum === "İnceleniyor" ? "status-pending" : "status-inactive"}`}>{item.durum}</span></td>
-              <td>{item.mesaj}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-
-  const renderBashekimNobetleri = () => (
-    <div className="table-container">
-      <div className="table-header" style={{ marginBottom: '20px' }}>
-        <h3>🗓️ Nöbet ve Çalışma Çizelgesi</h3>
-        <p style={{ color: '#64748b', marginTop: '8px' }}>
-          Eksik haftalık saat kalan doktorları görüntüleyin ve nöbet atayın.
-        </p>
-      </div>
-
-      <div className="mhrs-action-grid" style={{ marginBottom: '20px' }}>
-        <div className="mhrs-secondary-panel">
-          <h3>Eksik Çalışan Doktor</h3>
-          <p>{bashekimCalismaOzeti.filter(d => d.eksikSaat > 0).length} kişi</p>
-        </div>
-        <div className="mhrs-secondary-panel">
-          <h3>Yeterli Çalışan Doktor</h3>
-          <p>{bashekimCalismaOzeti.filter(d => d.durum === "Yeterli").length} kişi</p>
-        </div>
-        <div className="mhrs-secondary-panel">
-          <h3>Toplam Nöbet</h3>
-          <p>{nobetListesi.length} kayıt</p>
-        </div>
-        <div className="mhrs-secondary-panel">
-          <h3>Otomatik Öneri</h3>
-          <button
-            className="login-submit-btn"
-            style={{ marginTop: '10px', width: 'auto', padding: '10px 16px' }}
-            onClick={otomatikNobetOnerisiOlustur}
-          >
-            Nöbet Listesi Oluştur
-          </button>
-        </div>
-      </div>
-
-      <h4 style={{ marginBottom: '12px' }}>Doktor Haftalık Çalışma Durumu</h4>
-      <table className="modern-table" style={{ marginBottom: '24px' }}>
-        <thead>
-          <tr>
-            <th>Doktor</th>
-            <th>Poliklinik</th>
-            <th>Hedef Saat</th>
-            <th>Toplam Saat</th>
-            <th>Eksik Saat</th>
-            <th>Durum</th>
-            <th>İşlem</th>
-          </tr>
-        </thead>
-        <tbody>
-          {bashekimCalismaOzeti.map(item => (
-            <tr key={item.doktorId}>
-              <td>{item.doktor}</td>
-              <td>{item.poliklinik}</td>
-              <td>{item.hedefSaat}</td>
-              <td>{item.toplamSaat}</td>
-              <td>{item.eksikSaat}</td>
-              <td>
-                <span className={`status-badge ${
-                  item.durum === "Eksik" ? "status-inactive" :
-                  item.durum === "Yeterli" ? "status-active" :
-                  "status-pending"
-                }`}>
-                  {item.durum}
-                </span>
-              </td>
-              <td>
-                <button
-                  onClick={() => doktoraNobetAta(item)}
-                  style={{ background: '#2563eb', color: 'white', border: 'none', padding: '8px 12px', borderRadius: '8px', cursor: 'pointer' }}
-                >
-                  Nöbet Ata
-                </button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-
-      <h4 style={{ marginBottom: '12px' }}>Oluşturulan Nöbet Listesi</h4>
-      <table className="modern-table">
-        <thead><tr><th>Doktor</th><th>Poliklinik</th><th>Tarih</th><th>Saat</th><th>Durum</th></tr></thead>
-        <tbody>
-          {nobetListesi.map(item => (
-            <tr key={item.id}>
-              <td>{item.doktor}</td>
-              <td>{item.poliklinik}</td>
-              <td>{formatTarih(item.tarih)}</td>
-              <td>{item.saat}</td>
-              <td>
-                <span className={`status-badge ${item.durum === "Onaylı" ? "status-active" : "status-pending"}`}>
-                  {item.durum}
-                </span>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-
-  const renderBashekimPerformansAnalizi = () => {
-    const { baslangic, bitis } = tarihAraligiGetir();
-
+  // ─── Yükleniyor ─────────────────────────────────────────────────────────────
+  if (yukleniyor) {
     return (
-      <div className="table-container">
-        <div className="table-header" style={{ marginBottom: '20px' }}>
-          <h3>📊 Doktor Performans Analizi</h3>
-          <p style={{ color: '#64748b', marginTop: '8px' }}>
-            Günlük, haftalık, aylık veya özel tarih aralığına göre doktor performansını inceleyin.
-          </p>
-        </div>
-
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-            gap: '12px',
-            marginBottom: '20px',
-            padding: '16px',
-            background: '#f8fafc',
-            border: '1px solid #e2e8f0',
-            borderRadius: '12px'
-          }}
-        >
-          <div>
-            <label style={{ display: 'block', marginBottom: '8px', fontWeight: 600 }}>Görünüm Tipi</label>
-            <select
-              className="login-input"
-              value={performansFiltreTipi}
-              onChange={(e) => setPerformansFiltreTipi(e.target.value)}
-            >
-              <option value="gunluk">Günlük</option>
-              <option value="haftalik">Haftalık</option>
-              <option value="aylik">Aylık</option>
-              <option value="aralik">Tarih Aralığı</option>
-            </select>
-          </div>
-
-          {performansFiltreTipi !== "aralik" ? (
-            <div>
-              <label style={{ display: 'block', marginBottom: '8px', fontWeight: 600 }}>Referans Tarihi</label>
-              <input
-                type="date"
-                className="login-input"
-                value={performansReferansTarihi}
-                onChange={(e) => setPerformansReferansTarihi(e.target.value)}
-              />
-            </div>
-          ) : (
-            <>
-              <div>
-                <label style={{ display: 'block', marginBottom: '8px', fontWeight: 600 }}>Başlangıç</label>
-                <input
-                  type="date"
-                  className="login-input"
-                  value={performansBaslangicTarihi}
-                  onChange={(e) => setPerformansBaslangicTarihi(e.target.value)}
-                />
-              </div>
-              <div>
-                <label style={{ display: 'block', marginBottom: '8px', fontWeight: 600 }}>Bitiş</label>
-                <input
-                  type="date"
-                  className="login-input"
-                  value={performansBitisTarihi}
-                  onChange={(e) => setPerformansBitisTarihi(e.target.value)}
-                />
-              </div>
-            </>
-          )}
-
-          <div style={{ display: 'flex', alignItems: 'end', fontWeight: 700, color: '#0f172a' }}>
-            Aralık: {formatTarih(baslangic)} - {formatTarih(bitis)}
-          </div>
-        </div>
-
-        <div className="mhrs-action-grid" style={{ marginBottom: '20px' }}>
-          <div className="mhrs-secondary-panel">
-            <h3>En Aktif Doktor</h3>
-            <p>{bashekimDoktorPerformanslari[0]?.doktor || "Veri yok"}</p>
-          </div>
-          <div className="mhrs-secondary-panel">
-            <h3>En Yüksek Saat</h3>
-            <p>{bashekimDoktorPerformanslari[0]?.toplamSaat || 0} saat</p>
-          </div>
-          <div className="mhrs-secondary-panel">
-            <h3>Toplam Hekim</h3>
-            <p>{bugunkuSistemOzeti.toplamHekim}</p>
-          </div>
-          <div className="mhrs-secondary-panel">
-            <h3>Filtreli Toplam Randevu</h3>
-            <p>{bashekimDoktorPerformanslari.reduce((top, item) => top + item.hastaSayisi, 0)}</p>
-          </div>
-        </div>
-
-        <h4 style={{ marginBottom: '12px' }}>Doktor Bazlı Performans</h4>
-        <table className="modern-table" style={{ marginBottom: '24px' }}>
-          <thead>
-            <tr>
-              <th>Doktor</th>
-              <th>Poliklinik</th>
-              <th>Toplam Saat</th>
-              <th>Aktif Gün</th>
-              <th>Randevu</th>
-              <th>Tamamlanan Muayene</th>
-              <th>Nöbet</th>
-              <th>Doluluk %</th>
-              <th>Skor</th>
-            </tr>
-          </thead>
-          <tbody>
-            {bashekimDoktorPerformanslari.map(item => (
-              <tr key={item.doktorId}>
-                <td>{item.doktor}</td>
-                <td>{item.poliklinik}</td>
-                <td>{item.toplamSaat}</td>
-                <td>{item.aktifGunSayisi}</td>
-                <td>{item.hastaSayisi}</td>
-                <td>{item.tamamlananMuayeneSayisi}</td>
-                <td>{item.nobetSayisi}</td>
-                <td>{item.dolulukOrani}%</td>
-                <td>{item.dolulukPuani}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-
-        <h4 style={{ marginBottom: '12px' }}>Poliklinik Yoğunluk Özeti</h4>
-        <table className="modern-table">
-          <thead><tr><th>Poliklinik</th><th>Randevu Sayısı</th><th>Müsait Slot</th><th>Yoğunluk</th></tr></thead>
-          <tbody>
-            {poliklinikYogunlukOzeti.map(item => (
-              <tr key={item.poliklinik}>
-                <td>{item.poliklinik}</td>
-                <td>{item.randevuSayisi}</td>
-                <td>{item.musaitSlot}</td>
-                <td>
-                  <span className={`status-badge ${
-                    item.seviye === "Yoğun" ? "status-inactive" :
-                    item.seviye === "Orta" ? "status-pending" :
-                    "status-active"
-                  }`}>
-                    {item.seviye}
-                  </span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    );
-  };
-
-  const renderDoktorMuayeneSurecleri = () => (
-    <div className="table-container">
-      <div className="table-header" style={{ marginBottom: '20px' }}>
-        <h3>🩺 Muayene ve Tahlil Süreç Yönetimi</h3>
-        <p style={{ color: '#64748b', marginTop: '8px' }}>Randevu alan hastaları adım adım yönetin.</p>
-      </div>
-      <div className="muayene-flow-list">
-        {doktoraAitMuayeneSurecleri.length > 0 ? doktoraAitMuayeneSurecleri.map(item => {
-          const muayene = item.muayene;
-          const durum = muayene?.durum || item.durum;
-          return (
-            <div key={item.id} className="muayene-flow-card">
-              <div className="muayene-flow-top">
-                <div><h4>{item.doktor} • {item.poliklinik}</h4><p>Randevu ID: {item.id}</p></div>
-                <span className={`status-badge ${durum === "TAMAMLANDI" || durum === "RECETE_YAZILDI" || durum === "DOKTOR_INCELEDI" ? "status-active" : "status-pending"}`}>{durum}</span>
-              </div>
-              <div className="muayene-flow-meta">
-                <div><strong>Tarih:</strong> {formatTarih(item.tarih)}</div>
-                <div><strong>Saat:</strong> {item.saat}</div>
-                <div><strong>Şikayet:</strong> {item.sikayet}</div>
-              </div>
-              <div className="surec-adimlari">
-                <span className={`surec-chip ${item.durum === "HASTA_GELDI" || item.durum === "MUAYENEDE" || muayene ? "active" : ""}`}>Hasta Geldi</span>
-                <span className={`surec-chip ${muayene ? "active" : ""}`}>Muayene Başladı</span>
-                <span className={`surec-chip ${item.tahliller.length > 0 ? "active" : ""}`}>Tahlil İstendi</span>
-                <span className={`surec-chip ${item.tahliller.some(t => t.durum === "LABORATUVARDA" || t.durum === "SONUCLANDI" || t.durum === "DOKTOR_INCELEDI") ? "active" : ""}`}>Numune / Lab</span>
-                <span className={`surec-chip ${item.sonuclar.length > 0 ? "active" : ""}`}>Sonuçlandı</span>
-                <span className={`surec-chip ${item.recete ? "active" : ""}`}>Reçete</span>
-                <span className={`surec-chip ${durum === "TAMAMLANDI" ? "active" : ""}`}>Tamamlandı</span>
-              </div>
-              {muayene && (
-                <div className="muayene-detay-box">
-                  <p><strong>Ön Tanı:</strong> {muayene.onTani}</p>
-                  <p><strong>Doktor Notu:</strong> {muayene.doktorNotu}</p>
-                  {item.tahliller.length > 0 && <p><strong>İstenen Tahliller:</strong> {item.tahliller.map(t => `${t.tahlilTuru} (${t.durum})`).join(", ")}</p>}
-                  {item.sonuclar.length > 0 && <p><strong>Sonuç Özeti:</strong> {item.sonuclar.map(s => s.sonucOzeti).join(" | ")}</p>}
-                  {item.recete && <p><strong>Reçete:</strong> {item.recete.ilaclar.map(i => `${i.ilacAdi} - ${i.kullanim}`).join(" / ")}</p>}
-                </div>
-              )}
-              <div className="muayene-action-row">
-                <button className="process-btn" onClick={() => hastaGeldiIsaretle(item.id)}>Hasta Geldi</button>
-                <button className="process-btn" onClick={() => muayeneBaslat(item)}>Muayeneyi Başlat</button>
-                <button className="process-btn" onClick={() => tahlilIste(item)}>Tahlil İste</button>
-                {muayene && (
-                  <>
-                    <button className="process-btn secondary" onClick={() => numuneVerildiIsaretle(muayene.id)}>Numune Verildi</button>
-                    <button className="process-btn secondary" onClick={() => tahlilSonucuHazirla(muayene.id)}>Sonucu Oluştur</button>
-                    <button className="process-btn secondary" onClick={() => sonucuIncele(muayene.id)}>Sonucu İncele</button>
-                    <button className="process-btn success" onClick={() => receteYaz(muayene.id, item.poliklinik)}>Reçete Yaz</button>
-                    <button className="process-btn complete" onClick={() => muayeneTamamla(item.id, muayene.id)}>Muayeneyi Tamamla</button>
-                  </>
-                )}
-              </div>
-            </div>
-          );
-        }) : <div className="mhrs-empty-state">Doktora ait aktif muayene süreci bulunamadı.</div>}
-      </div>
-    </div>
-  );
-
-  const renderHastaRandevuAkisi = () => {
-    const uygunHastaneler = hastaRandevuAkisi.aramaTuru === "poliklinik"
-      ? poliklinigeGoreUygunHastaneler(hastaRandevuAkisi.poliklinik)
-      : konumaGoreSiraliHastaneler(hastaRandevuAkisi.il);
-
-    const uygunPoliklinikler = hastaRandevuAkisi.hastaneId
-      ? hastaneyeGoreUygunPoliklinikler(hastaRandevuAkisi.hastaneId)
-      : Object.keys(DOKTOR_HAVUZU);
-
-    const uygunDoktorlar = hastaRandevuAkisi.hastaneId && hastaRandevuAkisi.poliklinik
-      ? hastaneVePoliklinigeGoreDoktorlar(hastaRandevuAkisi.hastaneId, hastaRandevuAkisi.poliklinik)
-          .map(doc => {
-            const kontrol = hastaninAyniDoktoraRandevuEngeli(Number(girisYapanKullanici?.id), Number(doc.id));
-            return { ...doc, randevuEngeliVar: kontrol?.engelVar || false, randevuEngelMesaji: kontrol?.mesaj || "" };
-          })
-      : [];
-
-    if (randevuAdimi === "ana") {
-      return (
-        <div className="mhrs-flow-shell">
-          <div className="mhrs-action-grid">
-            <button className="mhrs-main-action-card hospital" onClick={() => setRandevuAdimi("arama-turu")}>
-              <div className="mhrs-main-action-icon">🏥</div>
-              <div><h3>Hastaneden Randevu Al</h3><p>Poliklinik veya konuma göre uygun hastane ve hekim seçin.</p></div>
-            </button>
-            <div className="mhrs-secondary-panel">
-              <h3>Yaklaşan Randevularım</h3>
-              <p>{randevuListesi.length > 0 ? `${randevuListesi.length} adet randevu kaydınız görüntüleniyor.` : "Yaklaşan randevunuz bulunmamaktadır."}</p>
-            </div>
-          </div>
-        </div>
-      );
-    }
-
-    if (randevuAdimi === "arama-turu") {
-      return (
-        <div className="mhrs-flow-shell">
-          <div className="mhrs-step-top"><button className="mhrs-back-btn" onClick={geriGitRandevuAkisi}>←</button><h3>Hastaneden Randevu Al</h3></div>
-          <div className="mhrs-choice-grid">
-            <button className="mhrs-choice-card poliklinik" onClick={() => handleAramaTuruSec("poliklinik")}><span className="mhrs-choice-icon">📋</span><span>Polikliniğe Göre</span></button>
-            <button className="mhrs-choice-card konum" onClick={() => handleAramaTuruSec("konum")}><span className="mhrs-choice-icon">📍</span><span>Konuma Göre</span></button>
-          </div>
-        </div>
-      );
-    }
-
-    if (randevuAdimi === "konum-sec") {
-      const konumdakiHastaneler = bulunanKonum.il ? konumaGoreSiraliHastaneler(bulunanKonum.il) : [];
-
-      return (
-        <div className="mhrs-flow-shell">
-          <div className="mhrs-step-top"><button className="mhrs-back-btn" onClick={geriGitRandevuAkisi}>←</button><h3>Konum Seçiniz</h3></div>
-          <div className="mhrs-list-panel">
-            <div className="mhrs-inline-actions">
-              <button className="login-submit-btn" onClick={konumuTespitEt} disabled={konumYukleniyor}>
-                {konumYukleniyor ? "Konum Alınıyor..." : "📍 Mevcut Konumumu Kullan"}
-              </button>
-            </div>
-
-            {bulunanKonum.il && (
-              <div className="status-indicator" style={{ marginBottom: '14px' }}>
-                Mevcut konum: <b>{bulunanKonum.il} / {bulunanKonum.ilce}</b><br /><small>{bulunanKonum.detay}</small>
-              </div>
-            )}
-
-            {bulunanKonum.il && (
-              <>
-                <div style={{ color: '#64748b', fontWeight: 600, marginBottom: '10px' }}>
-                  Konumunuza uygun hastaneler aşağıda listelendi:
-                </div>
-
-                {konumdakiHastaneler.length > 0 ? konumdakiHastaneler.map(hastane => (
-                  <button key={hastane.id} className="mhrs-hospital-card" onClick={() => handleHastaHastaneSec(hastane.id)}>
-                    <div className="mhrs-hospital-header">
-                      <div><h4>{hastane.ad}</h4><p>{hastane.il} / {hastane.ilce}</p></div>
-                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-                        {hastane.enYakinMi && <span className="mhrs-small-badge" style={{ background: '#dcfce7', color: '#166534' }}>⭐ Size En Yakın Hastane</span>}
-                        {typeof hastane.mesafeKm === "number" && <span className="mhrs-small-badge">{hastane.mesafeKm} km</span>}
-                      </div>
-                    </div>
-                  </button>
-                )) : <div className="mhrs-empty-state">Bu konumda uygun hastane bulunamadı.</div>}
-
-                <div style={{ marginTop: '14px' }}>
-                  <label style={{ display: 'block', marginBottom: '8px', fontWeight: 600, color: '#64748b' }}>
-                    Farklı bir il seçmek isterseniz:
-                  </label>
-                  <select className="login-input" value={seciliIl} onChange={(e) => handleHastaIlSec(e.target.value)}>
-                    <option value="">İl seçiniz</option>
-                    {HASTANELER.map(h => h.il).filter((v, i, arr) => arr.indexOf(v) === i).map(il => <option key={il} value={il}>{il}</option>)}
-                  </select>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-      );
-    }
-
-    if (randevuAdimi === "poliklinik-sec") {
-      return (
-        <div className="mhrs-flow-shell">
-          <div className="mhrs-step-top"><button className="mhrs-back-btn" onClick={geriGitRandevuAkisi}>←</button><h3>Poliklinik Seçiniz</h3></div>
-          <div className="mhrs-list-panel">
-            {uygunPoliklinikler.map(pol => (
-              <button key={pol} className="mhrs-list-card" onClick={() => handleHastaPoliklinikSec(pol)}>
-                <div><h4>{pol}</h4><p>Bu alanda uygun hekimleri görüntüleyin.</p></div><span>›</span>
-              </button>
-            ))}
-          </div>
-        </div>
-      );
-    }
-
-    if (randevuAdimi === "hastane-sec") {
-      return (
-        <div className="mhrs-flow-shell">
-          <div className="mhrs-step-top"><button className="mhrs-back-btn" onClick={geriGitRandevuAkisi}>←</button><h3>Hastane Seçiniz</h3></div>
-          <div className="mhrs-list-panel">
-            {uygunHastaneler.length > 0 ? uygunHastaneler.map(hastane => (
-              <button key={hastane.id} className="mhrs-hospital-card" onClick={() => handleHastaHastaneSec(hastane.id)}>
-                <div className="mhrs-hospital-header">
-                  <div><h4>{hastane.ad}</h4><p>{hastane.il}{hastane.ilce ? ` / ${hastane.ilce}` : ""}</p></div>
-                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-                    {hastane.enYakinMi && hastaRandevuAkisi.aramaTuru === "konum" && (
-                      <span className="mhrs-small-badge" style={{ background: '#dcfce7', color: '#166534' }}>
-                        ⭐ Size En Yakın Hastane
-                      </span>
-                    )}
-                    {typeof hastane.mesafeKm === "number" && <span className="mhrs-small-badge">{hastane.mesafeKm} km</span>}
-                  </div>
-                </div>
-                {hastaRandevuAkisi.aramaTuru === "poliklinik" && <div className="mhrs-hospital-meta"><span>Poliklinik: {hastaRandevuAkisi.poliklinik}</span></div>}
-              </button>
-            )) : <div className="mhrs-empty-state">Seçtiğiniz kriterlere uygun hastane bulunamadı.</div>}
-          </div>
-        </div>
-      );
-    }
-
-    if (randevuAdimi === "doktor-sec") {
-      return (
-        <div className="mhrs-flow-shell">
-          <div className="mhrs-step-top"><button className="mhrs-back-btn" onClick={geriGitRandevuAkisi}>←</button><h3>Doktor Seçiniz</h3></div>
-          <div className="mhrs-list-panel">
-            {uygunDoktorlar.length > 0 ? uygunDoktorlar.map(doc => (
-              <button
-                key={doc.id}
-                className="mhrs-doctor-card"
-                onClick={() => {
-                  if (doc.randevuEngeliVar) {
-                    alert(doc.randevuEngelMesaji);
-                    return;
-                  }
-                  handleHastaDoktorSec(doc.id);
-                }}
-                disabled={doc.randevuEngeliVar}
-                style={doc.randevuEngeliVar ? { opacity: 0.6, cursor: 'not-allowed' } : {}}
-              >
-                <div className="mhrs-doctor-left">
-                  <div className="doc-avatar">👨‍⚕️</div>
-                  <div>
-                    <h4>{doc.ad}</h4>
-                    <p>{doc.unvan}</p>
-                    <small>{seciliHastane?.ad}</small>
-                    {doc.randevuEngeliVar && (
-                      <div style={{ marginTop: '6px', color: '#dc2626', fontSize: '0.85rem', fontWeight: 600 }}>
-                        Bu doktordan şu an tekrar randevu alamazsınız
-                      </div>
-                    )}
-                  </div>
-                </div>
-                <div className="mhrs-doctor-right">
-                  <span className="mhrs-small-badge">Uygun {doc.uygunSlotSayisi}</span>
-                  {doc.ilkMusaitSlot && <small>En yakın: {formatTarih(doc.ilkMusaitSlot.tarih)}</small>}
-                </div>
-              </button>
-            )) : <div className="mhrs-empty-state">Bu hastane ve poliklinikte müsait doktor bulunamadı.</div>}
-          </div>
-        </div>
-      );
-    }
-
-    if (randevuAdimi === "slot-sec") {
-      const tarihler = doktoraVeHastaneyeGoreMusaitTarihler(
-        hastaRandevuAkisi.doktorId,
-        hastaRandevuAkisi.hastaneId,
-        hastaRandevuAkisi.poliklinik
-      );
-
-      return (
-        <div className="mhrs-flow-shell">
-          <div className="mhrs-step-top"><button className="mhrs-back-btn" onClick={geriGitRandevuAkisi}>←</button><h3>Randevu Saati Seçiniz</h3></div>
-          <div className="mhrs-list-panel">
-            {tarihler.map(tarih => {
-              const saatler = doktoraVeHastaneyeGoreSaatler(
-                hastaRandevuAkisi.doktorId,
-                hastaRandevuAkisi.hastaneId,
-                hastaRandevuAkisi.poliklinik,
-                tarih
-              );
-
-              return (
-                <div key={tarih} className="mhrs-slot-group">
-                  <div className="mhrs-slot-date">{formatTarih(tarih)}</div>
-                  <div className="mhrs-slot-subtitle">{hastaRandevuAkisi.poliklinik} • {seciliDoktor?.ad}</div>
-                  <div className="mhrs-slot-grid">
-                    {saatler.map(slot => (
-                      <button key={slot.id} className="mhrs-slot-btn" onClick={() => handleHastaSlotSec(slot.id)}>
-                        {slot.saat}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      );
-    }
-
-    if (randevuAdimi === "onay" && randevuOzeti) {
-      const onayKontrolu = hastaninAyniDoktoraRandevuEngeli(
-        Number(girisYapanKullanici?.id),
-        Number(randevuOzeti.doktor.id),
-        randevuOzeti.slot.tarih
-      );
-
-      return (
-        <div className="mhrs-flow-shell">
-          <div className="mhrs-step-top"><button className="mhrs-back-btn" onClick={geriGitRandevuAkisi}>←</button><h3>Randevuyu Onayla</h3></div>
-          <div className="mhrs-confirm-card">
-            <div className="mhrs-confirm-row"><span>Tarih</span><strong>{formatTarih(randevuOzeti.slot.tarih)}</strong></div>
-            <div className="mhrs-confirm-row"><span>Saat</span><strong>{randevuOzeti.slot.saat}</strong></div>
-            <div className="mhrs-confirm-divider" />
-            <div className="mhrs-confirm-block">
-              <p><b>Hastane:</b> {randevuOzeti.hastane.ad}</p>
-              <p><b>Poliklinik:</b> {randevuOzeti.poliklinik}</p>
-              <p><b>Doktor:</b> {randevuOzeti.doktor.ad}</p>
-              <p><b>Randevu Sahibi:</b> {girisYapanKullanici.adSoyad}</p>
-            </div>
-          </div>
-
-          {onayKontrolu?.engelVar && (
-            <div style={{ marginTop: '14px', marginBottom: '10px', padding: '12px 14px', background: '#fee2e2', color: '#991b1b', borderRadius: '10px', fontWeight: 600 }}>
-              {onayKontrolu.mesaj}
-            </div>
-          )}
-
-          <button
-            className="mhrs-confirm-btn"
-            onClick={handleRandevuAl}
-            disabled={onayKontrolu?.engelVar}
-            style={onayKontrolu?.engelVar ? { opacity: 0.6, cursor: 'not-allowed' } : {}}
-          >
-            Randevuyu Onayla
-          </button>
-        </div>
-      );
-    }
-
-    return null;
-  };
-
-  // ─── Render ───────────────────────────────────────────────────────────────────
-  if (otomatikGirisYukleniyor) {
-    return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', fontSize: '1.2rem', color: '#64748b' }}>
+      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh", fontSize: "1.2rem", color: "#64748b" }}>
         Yükleniyor...
       </div>
     );
   }
 
+  // ─── Giriş ekranı ────────────────────────────────────────────────────────────
   if (!girisYapanKullanici) {
     return (
       <Login
-        handleGiris={handleGiris}
-        tcNo={tcNo}
-        setTcNo={setTcNo}
-        sifre={sifre}
-        setSifre={setSifre}
-        hataMesaji={hataMesaji}
-        kayitModu={kayitModu}
-        setKayitModu={setKayitModu}
-        geriDon={() => setKayitModu(false)}
-        yeniHastaEkle={yeniHastaEkle}
-        beklemeSuresi={beklemeSuresi}
-        isBanned={isBanned}
+        handleGiris={auth.handleGiris}
+        tcNo={auth.tcNo} setTcNo={auth.setTcNo}
+        sifre={auth.sifre} setSifre={auth.setSifre}
+        hataMesaji={auth.hataMesaji}
+        kayitModu={auth.kayitModu} setKayitModu={auth.setKayitModu}
+        geriDon={() => auth.setKayitModu(false)}
+        yeniHastaEkle={auth.yeniHastaEkle}
+        beklemeSuresi={auth.beklemeSuresi}
+        isBanned={auth.isBanned}
       />
     );
   }
 
+  const rol = girisYapanKullanici.rol;
+
+  // ─── Dashboard ────────────────────────────────────────────────────────────────
   return (
     <div className="dashboard-wrapper">
       <Sidebar
-        rol={girisYapanKullanici.rol}
+        rol={rol}
         aktifSekme={aktifSekme}
         setAktifSekme={setAktifSekme}
-        logout={() => {
-          localStorage.removeItem("token");
-          setGirisYapanKullanici(null);
-          resetHastaRandevuAkisi();
-        }}
+        logout={() => { cikisYap(); randevu.resetAkis(); }}
       />
 
       <main className="main-content">
@@ -2113,344 +316,147 @@ export default function App() {
           <h2>{aktifSekme}</h2>
           <div className="user-info">
             <span className="user-name">{girisYapanKullanici.adSoyad}</span>
-            <span className="user-role-tag">{girisYapanKullanici.rol}</span>
+            <span className="user-role-tag">{rol}</span>
           </div>
         </header>
 
         <div className="tab-content">
-          {aktifSekme === "Ana Sayfa" && (
+
+          {/* ── Ana Sayfa ── */}
+          {aktifSekme === "Ana Sayfa" && rol === "HASTA" && (
             <>
-              {girisYapanKullanici.rol === "HASTA" ? (
-                <>
-                  <div className="mhrs-banner">Hoş Geldiniz, {girisYapanKullanici.adSoyad}</div>
-                  {renderHastaRandevuAkisi()}
-                </>
-              ) : girisYapanKullanici.rol === "BASHEKIM" ? renderBashekimDashboard() : (
-                <div className="table-container">
-                  <h3 style={{ marginBottom: '8px' }}>Sistem Özeti</h3>
-                  <p style={{ color: '#64748b' }}>Bu panel üzerinden profil, randevu ve çalışma takvimi işlemlerinizi yönetebilirsiniz.</p>
-                </div>
-              )}
+              <div className="mhrs-banner">Hoş Geldiniz, {girisYapanKullanici.adSoyad}</div>
+              <HastaRandevuAkisi
+                randevuAdimi={randevu.randevuAdimi}
+                hastaRandevuAkisi={randevu.hastaRandevuAkisi}
+                randevuListesi={randevuListesi}
+                randevuOzeti={randevu.randevuOzeti}
+                bulunanKonum={randevu.bulunanKonum}
+                konumYukleniyor={randevu.konumYukleniyor}
+                seciliIl={randevu.seciliIl}
+                seciliHastane={randevu.seciliHastane}
+                seciliDoktor={randevu.seciliDoktor}
+                girisYapanKullanici={girisYapanKullanici}
+                poliklinigeGoreHastaneler={randevu.poliklinigeGoreHastaneler}
+                konumaSiraliHastaneler={randevu.konumaSiraliHastaneler}
+                hastaneyeGorePoliklinikler={randevu.hastaneyeGorePoliklinikler}
+                hastanePoliklinigeGoreDoktorlar={randevu.hastanePoliklinigeGoreDoktorlar}
+                musaitTarihler={randevu.musaitTarihler}
+                tariheSaatler={randevu.tariheSaatler}
+                randevuEngeliKontrol={randevu.randevuEngeliKontrol}
+                geriGit={randevu.geriGit}
+                aramaTuruSec={randevu.aramaTuruSec}
+                ilSec={randevu.ilSec}
+                poliklinikSec={randevu.poliklinikSec}
+                hastaneSec={randevu.hastaneSec}
+                doktorSec={randevu.doktorSec}
+                slotSec={randevu.slotSec}
+                randevuAl={randevu.randevuAl}
+                konumuTespitEt={randevu.konumuTespitEt}
+              />
             </>
           )}
-
-          {aktifSekme === "Kişisel Bilgiler" && girisYapanKullanici.rol === "HASTA" && <PatientProfileInfo hasta={girisYapanKullanici} />}
-          {aktifSekme === "Kişisel Bilgiler" && girisYapanKullanici.rol === "PERSONEL" && <TablePersonel personel={girisYapanKullanici} />}
-
-          {aktifSekme === "Doktor Bilgileri" && girisYapanKullanici.rol === "DOKTOR" && (
-            <>
-              <div
-                style={{
-                  marginBottom: '16px',
-                  padding: '14px 16px',
-                  background: '#f8fafc',
-                  border: '1px solid #e2e8f0',
-                  borderRadius: '12px',
-                  fontWeight: 600,
-                  color: '#0f172a'
-                }}
-              >
-                Muayene Ücreti: {formatTL(girisYapanKullanici.muayeneUcreti)}
-              </div>
-
-              <DoctorProfileInfo doktor={girisYapanKullanici} baslik="SAĞLIK PERSONELİ" />
-            </>
+          {aktifSekme === "Ana Sayfa" && rol === "BASHEKIM" && (
+            <BashekimDashboard
+              adSoyad={girisYapanKullanici.adSoyad}
+              sistemOzeti={sistemOzeti}
+              performanslar={bashekimPerformanslar}
+              setAktifSekme={setAktifSekme}
+            />
+          )}
+          {aktifSekme === "Ana Sayfa" && !["HASTA", "BASHEKIM"].includes(rol) && (
+            <div className="table-container">
+              <h3 style={{ marginBottom: 8 }}>Sistem Özeti</h3>
+              <p style={{ color: "#64748b" }}>Bu panel üzerinden profil, randevu ve çalışma takvimi işlemlerinizi yönetebilirsiniz.</p>
+            </div>
           )}
 
-          {(aktifSekme === "Başhekim Profili" || (aktifSekme === "Doktor Bilgileri" && girisYapanKullanici.rol === "BASHEKIM")) && (
+          {/* ── Profil ── */}
+          {aktifSekme === "Kişisel Bilgiler" && rol === "HASTA" && <PatientProfileInfo hasta={girisYapanKullanici} />}
+          {aktifSekme === "Kişisel Bilgiler" && rol === "PERSONEL" && <TablePersonel personel={girisYapanKullanici} />}
+          {aktifSekme === "Doktor Bilgileri" && rol === "DOKTOR" && <DoctorProfileInfo doktor={girisYapanKullanici} baslik="SAĞLIK PERSONELİ" />}
+          {(aktifSekme === "Başhekim Profili" || (aktifSekme === "Doktor Bilgileri" && rol === "BASHEKIM")) && (
             <DoctorProfileInfo doktor={girisYapanKullanici} baslik="BAŞHEKİM" />
           )}
 
+          {/* ── Randevu / Tahlil ── */}
           {aktifSekme === "Randevularım" && <TableRandevular veriler={goruntulenecekRandevular} />}
-          {aktifSekme === "Tahlillerim" && <TableTahliller veriler={hastayaAitTahlilGorunumu} />}
+          {aktifSekme === "Tahlillerim" && <TableTahliller veriler={hastaTahlilGorunumu} />}
+
+          {/* ── Doktor panelleri ── */}
+          {aktifSekme === "Muayene Süreçleri" && rol === "DOKTOR" && (
+            <MuayeneSurecleri
+              surecleri={doktorMuayeneSurecleri}
+              hastaGeldiIsaretle={muayene.hastaGeldiIsaretle}
+              muayeneBaslat={muayene.muayeneBaslat}
+              tahlilIste={muayene.tahlilIste}
+              numuneVerildiIsaretle={muayene.numuneVerildiIsaretle}
+              tahlilSonucuHazirla={muayene.tahlilSonucuHazirla}
+              sonucuIncele={muayene.sonucuIncele}
+              receteYaz={muayene.receteYaz}
+              muayeneTamamla={muayene.muayeneTamamla}
+            />
+          )}
+          {aktifSekme === "Çalışma Takvimi" && rol === "DOKTOR" && (
+            <CalismaTakvimi
+              aktifDoktorDemoKaydi={aktifDoktorDemoKaydi}
+              randevuSlotlari={randevuSlotlari}
+              doktorTakvimFormu={takvim.doktorTakvimFormu}
+              setDoktorTakvimFormu={takvim.setDoktorTakvimFormu}
+              doktorHaftalikPlanlari={takvim.doktorHaftalikPlanlari}
+              setDoktorHaftalikPlanlari={takvim.setDoktorHaftalikPlanlari}
+              haftalikOzet={haftalikOzet}
+              muayeneUcreti={girisYapanKullanici.muayeneUcreti}
+              muayeneUcretiInput={muayeneUcretiInput}
+              setMuayeneUcretiInput={setMuayeneUcretiInput}
+              ucretGuncelleniyor={ucretGuncelleniyor}
+              onUcretGuncelle={handleMuayeneUcretiGuncelle}
+              onSlotEkle={() => takvim.slotEkle(aktifDoktorDemoKaydi)}
+              onSlotSil={takvim.slotSil}
+              onHaftalikHedefKaydet={() =>
+                takvim.haftalikHedefGuncelle(
+                  aktifDoktorDemoKaydi.id,
+                  takvim.doktorHaftalikPlanlari[aktifDoktorDemoKaydi.id]?.hedefSaat
+                )
+              }
+              saatSeciminiDegistir={takvim.saatSeciminiDegistir}
+              VARSAYILAN_HEDEF={takvim.VARSAYILAN_HEDEF}
+              MIN_HAFTALIK={takvim.MIN_HAFTALIK}
+              MAX_HAFTALIK={takvim.MAX_HAFTALIK}
+              slotSirala={slotSirala}
+            />
+          )}
+
+          {/* ── Başhekim panelleri ── */}
+          {(aktifSekme === "Şikayet/Öneri Yönetimi" || (aktifSekme === "Şikayet/Öneri" && rol === "BASHEKIM")) && (
+            <BashekimSikayetleri />
+          )}
+          {aktifSekme === "Nöbet ve Çalışma Çizelgesi" && rol === "BASHEKIM" && (
+            <BashekimNobetleri
+              bashekimCalismaOzeti={takvim.bashekimCalismaOzeti}
+              nobetListesi={takvim.nobetListesi}
+              onNobetAta={takvim.nobetAta}
+              onOtomatikNobetOnerisi={takvim.otomatikNobetOnerisi}
+            />
+          )}
+          {aktifSekme === "Performans Analizi" && rol === "BASHEKIM" && (
+            <BashekimPerformansAnalizi
+              performanslar={bashekimPerformanslar}
+              poliklinikOzeti={poliklinikOzeti}
+              sistemOzeti={sistemOzeti}
+              filtreTipi={performansFiltreTipi} setFiltreTipi={setPerformansFiltreTipi}
+              referansTarih={performansReferansTarihi} setReferansTarih={setPerformansReferansTarihi}
+              baslangicTarih={performansBaslangic} setBaslangicTarih={setPerformansBaslangic}
+              bitisTarih={performansBitis} setBitisTarih={setPerformansBitis}
+            />
+          )}
+
+          {/* ── Ortak ── */}
           {aktifSekme === "Otopark Durumu" && <ParkingLot />}
           {aktifSekme === "Yatışlar" && <TableYatislar />}
+          {aktifSekme === "Şikayet/Öneri" && rol !== "BASHEKIM" && <TableSikayet />}
+          {aktifSekme === "Personel" && rol !== "PERSONEL" && <TablePersonel personel={null} />}
 
-          {aktifSekme === "Personel" && girisYapanKullanici.rol === "PERSONEL" && (
-            <TablePersonel personel={girisYapanKullanici} />
-          )}
-
-          {aktifSekme === "Muayene Süreçleri" && girisYapanKullanici.rol === "DOKTOR" && renderDoktorMuayeneSurecleri()}
-          {aktifSekme === "Şikayet/Öneri" && girisYapanKullanici.rol !== "BASHEKIM" && <TableSikayet />}
-          {(aktifSekme === "Şikayet/Öneri Yönetimi" || (aktifSekme === "Şikayet/Öneri" && girisYapanKullanici.rol === "BASHEKIM")) && renderBashekimSikayetleri()}
-          {aktifSekme === "Nöbet ve Çalışma Çizelgesi" && girisYapanKullanici.rol === "BASHEKIM" && renderBashekimNobetleri()}
-          {aktifSekme === "Performans Analizi" && girisYapanKullanici.rol === "BASHEKIM" && renderBashekimPerformansAnalizi()}
-
-          {aktifSekme === "Çalışma Takvimi" && girisYapanKullanici.rol === "DOKTOR" && (
-            <div className="table-container">
-              <div className="table-header" style={{ marginBottom: '20px' }}>
-                <h3>🗓️ Çalışma Takvimi Yönetimi</h3>
-                <p style={{ color: '#64748b', marginTop: '8px' }}>Hastane, gün ve saat seçerek kendi uygunluk planınızı oluşturun.</p>
-              </div>
-
-              <div
-                style={{
-                  marginBottom: '16px',
-                  padding: '16px',
-                  background: '#f8fafc',
-                  border: '1px solid #e2e8f0',
-                  borderRadius: '12px',
-                  color: '#0f172a'
-                }}
-              >
-                <div style={{ fontWeight: 700, marginBottom: '10px' }}>
-                  Muayene Ücreti: {formatTL(girisYapanKullanici.muayeneUcreti)}
-                </div>
-
-                <div style={{ marginBottom: '8px', color: '#64748b', fontSize: '0.95rem' }}>
-                  Ücret aralığı: {MIN_MUAYENE_UCRETI} TL - {MAX_MUAYENE_UCRETI} TL
-                </div>
-
-                <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-                  <input
-                    type="number"
-                    min={MIN_MUAYENE_UCRETI}
-                    max={MAX_MUAYENE_UCRETI}
-                    step="50"
-                    value={muayeneUcretiInput}
-                    onChange={(e) => setMuayeneUcretiInput(e.target.value)}
-                    placeholder="Muayene ücreti giriniz"
-                    className="login-input"
-                    style={{ maxWidth: '220px' }}
-                  />
-
-                  <button
-                    className="login-submit-btn"
-                    onClick={handleMuayeneUcretiGuncelle}
-                    disabled={ucretGuncelleniyor}
-                    style={{ width: 'auto', padding: '10px 18px' }}
-                  >
-                    {ucretGuncelleniyor ? "Kaydediliyor..." : "Ücreti Kaydet"}
-                  </button>
-                </div>
-              </div>
-
-              {aktifDoktorDemoKaydi ? (
-                <>
-                  <div className="schedule-summary-card">
-                    <h4>{aktifDoktorDemoKaydi.ad}</h4>
-                    <p>{aktifDoktorDemoKaydi.unvan} • {aktifDoktorDemoKaydi.poliklinik}</p>
-                  </div>
-
-                  <div
-                    style={{
-                      marginBottom: '20px',
-                      padding: '16px',
-                      background: '#f8fafc',
-                      border: '1px solid #e2e8f0',
-                      borderRadius: '12px'
-                    }}
-                  >
-                    <div
-                      style={{
-                        display: 'grid',
-                        gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-                        gap: '14px',
-                        alignItems: 'end'
-                      }}
-                    >
-                      <div>
-                        <label style={{ display: 'block', marginBottom: '8px', fontWeight: 700 }}>
-                          Haftalık Hedef Saat
-                        </label>
-                        <input
-                          type="number"
-                          min={MIN_HAFTALIK_CALISMA_SAATI}
-                          max={MAX_HAFTALIK_CALISMA_SAATI}
-                          className="login-input"
-                          value={doktorHaftalikPlanlari[aktifDoktorDemoKaydi.id]?.hedefSaat || VARSAYILAN_HAFTALIK_HEDEF}
-                          onChange={(e) =>
-                            setDoktorHaftalikPlanlari(prev => ({
-                              ...prev,
-                              [aktifDoktorDemoKaydi.id]: {
-                                ...(prev[aktifDoktorDemoKaydi.id] || {}),
-                                hedefSaat: e.target.value
-                              }
-                            }))
-                          }
-                        />
-                        <div style={{ color: '#64748b', fontSize: '0.9rem', marginTop: '6px' }}>
-                          Sınır: {MIN_HAFTALIK_CALISMA_SAATI}-{MAX_HAFTALIK_CALISMA_SAATI} saat
-                        </div>
-                        <button
-                          className="login-submit-btn"
-                          style={{ marginTop: '10px', width: 'auto', padding: '10px 16px' }}
-                          onClick={() =>
-                            doktorHaftalikHedefGuncelle(
-                              aktifDoktorDemoKaydi.id,
-                              doktorHaftalikPlanlari[aktifDoktorDemoKaydi.id]?.hedefSaat || VARSAYILAN_HAFTALIK_HEDEF
-                            )
-                          }
-                        >
-                          Haftalık Hedefi Kaydet
-                        </button>
-                      </div>
-
-                      <div className="mhrs-secondary-panel">
-                        <h3>Hafta Aralığı</h3>
-                        <p>{aktifDoktorHaftalikOzeti?.haftaBaslangic ? `${formatTarih(aktifDoktorHaftalikOzeti.haftaBaslangic)} - ${formatTarih(aktifDoktorHaftalikOzeti.haftaBitis)}` : "-"}</p>
-                      </div>
-
-                      <div className="mhrs-secondary-panel">
-                        <h3>Doldurulan Saat</h3>
-                        <p>{aktifDoktorHaftalikOzeti?.mevcutSaat || 0} saat</p>
-                      </div>
-
-                      <div className="mhrs-secondary-panel">
-                        <h3>Kalan Saat</h3>
-                        <p>{aktifDoktorHaftalikOzeti?.kalanSaat || 0} saat</p>
-                      </div>
-
-                      <div className="mhrs-secondary-panel">
-                        <h3>Seçili Ek Saat</h3>
-                        <p>{aktifDoktorHaftalikOzeti?.seciliEkSaat || 0} saat</p>
-                      </div>
-                    </div>
-
-                    <div style={{ marginTop: '14px' }}>
-                      <div style={{ fontWeight: 700, marginBottom: '8px' }}>
-                        Haftalık Doluluk Durumu
-                      </div>
-                      <div
-                        style={{
-                          width: '100%',
-                          height: '14px',
-                          background: '#e2e8f0',
-                          borderRadius: '999px',
-                          overflow: 'hidden'
-                        }}
-                      >
-                        <div
-                          style={{
-                            width: `${Math.min(((aktifDoktorHaftalikOzeti?.mevcutSaat || 0) / (aktifDoktorHaftalikOzeti?.hedefSaat || VARSAYILAN_HAFTALIK_HEDEF)) * 100, 100)}%`,
-                            height: '100%',
-                            background:
-                              (aktifDoktorHaftalikOzeti?.fazlaMi) ? '#f59e0b' :
-                              (aktifDoktorHaftalikOzeti?.yeterliMi) ? '#22c55e' :
-                              '#3b82f6'
-                          }}
-                        />
-                      </div>
-
-                      <div style={{ marginTop: '8px', fontWeight: 600, color: '#334155' }}>
-                        {aktifDoktorHaftalikOzeti?.fazlaMi
-                          ? `Haftalık üst sınır aşıldı.`
-                          : aktifDoktorHaftalikOzeti?.yeterliMi
-                          ? `Haftalık hedef tamamlandı.`
-                          : `Haftalık hedef için ${(aktifDoktorHaftalikOzeti?.kalanSaat || 0)} saat daha gerekli.`}
-                      </div>
-
-                      {(aktifDoktorHaftalikOzeti?.eklenecekSonrasiSaat || 0) > MAX_HAFTALIK_CALISMA_SAATI && (
-                        <div style={{ marginTop: '8px', color: '#dc2626', fontWeight: 700 }}>
-                          Seçili saatlerle birlikte haftalık üst sınır aşılacak.
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="schedule-builder-card">
-                    <div className="schedule-form-grid">
-                      <div>
-                        <label className="schedule-label">Hastane Seçiniz</label>
-                        <div className="schedule-date-card">
-                          <div className="schedule-date-input-wrap">
-                            <span className="schedule-date-icon">🏥</span>
-                            <select
-                              className="schedule-date-input"
-                              value={doktorTakvimFormu.hastaneId}
-                              onChange={(e) => setDoktorTakvimFormu(prev => ({ ...prev, hastaneId: e.target.value, seciliSaatler: [] }))}
-                            >
-                              <option value="">Hastane seçiniz</option>
-                              {HASTANELER.map(h => <option key={h.id} value={h.id}>{h.ad}</option>)}
-                            </select>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="schedule-label">Gün Seçiniz</label>
-                        <div className="schedule-date-card">
-                          <div className="schedule-date-input-wrap">
-                            <span className="schedule-date-icon">📅</span>
-                            <input
-                              type="date"
-                              className="schedule-date-input"
-                              value={doktorTakvimFormu.tarih}
-                              onChange={(e) => setDoktorTakvimFormu(prev => ({ ...prev, tarih: e.target.value, seciliSaatler: [] }))}
-                            />
-                          </div>
-                          <div className="schedule-date-preview">
-                            {doktorTakvimFormu.tarih ? `Seçilen gün: ${formatTarih(doktorTakvimFormu.tarih)}` : "Henüz bir gün seçilmedi"}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div style={{ marginTop: '16px' }}>
-                      <label className="schedule-label">Saat Seçiniz</label>
-                      <div className="schedule-time-grid">
-                        {SAAT_SECENEKLERI.map(saat => (
-                          <button
-                            type="button"
-                            key={saat}
-                            className={`schedule-time-chip ${doktorTakvimFormu.seciliSaatler.includes(saat) ? 'active' : ''}`}
-                            onClick={() => doktorSaatSeciminiDegistir(saat)}
-                          >
-                            {saat}
-                          </button>
-                        ))}
-                      </div>
-                      <div className="schedule-selected-info">
-                        {doktorTakvimFormu.seciliSaatler.length > 0 ? `Seçilen saatler: ${doktorTakvimFormu.seciliSaatler.join(", ")}` : "Henüz saat seçilmedi"}
-                      </div>
-                    </div>
-
-                    <button className="login-submit-btn" style={{ marginTop: '16px' }} onClick={doktorTakvimeSlotEkle}>
-                      Seçili Slotları Ekle
-                    </button>
-                  </div>
-
-                  <div style={{ marginBottom: '12px', fontWeight: 600, color: '#475569' }}>
-                    Bu haftaki toplam çalışma saatiniz: {aktifDoktorHaftalikOzeti?.mevcutSaat || 0} / {aktifDoktorHaftalikOzeti?.hedefSaat || VARSAYILAN_HAFTALIK_HEDEF}
-                  </div>
-
-                  <table className="modern-table">
-                    <thead><tr><th>Hastane</th><th>Tarih</th><th>Saat</th><th>Durum</th><th>İşlem</th></tr></thead>
-                    <tbody>
-                      {randevuSlotlari
-                        .filter(slot => Number(slot.doktorId) === Number(aktifDoktorDemoKaydi.id))
-                        .sort(slotSirala)
-                        .map(slot => {
-                          const hastane = HASTANELER.find(h => Number(h.id) === Number(slot.hastaneId));
-                          return (
-                            <tr key={slot.id}>
-                              <td>{hastane?.ad || "Hastane Yok"}</td>
-                              <td>{formatTarih(slot.tarih)}</td>
-                              <td>{slot.saat}</td>
-                              <td><span className={`status-badge ${slot.durum === "MUSAIT" ? "status-active" : "status-pending"}`}>{slot.durum}</span></td>
-                              <td>
-                                <button
-                                  onClick={() => doktorSlotSil(slot.id)}
-                                  style={{ background: '#ef4444', color: 'white', border: 'none', padding: '8px 12px', borderRadius: '8px', cursor: 'pointer' }}
-                                >
-                                  Sil
-                                </button>
-                              </td>
-                            </tr>
-                          );
-                        })}
-
-                      {randevuSlotlari.filter(slot => Number(slot.doktorId) === Number(aktifDoktorDemoKaydi.id)).length === 0 && (
-                        <tr><td colSpan="5" style={{ textAlign: 'center', padding: '20px', color: '#64748b' }}>Henüz tanımlanmış çalışma slotunuz bulunmuyor.</td></tr>
-                      )}
-                    </tbody>
-                  </table>
-                </>
-              ) : (
-                <div className="mhrs-empty-state">Doktor kaydınız demo hekim listesiyle eşleşmediği için takvim ekranı açılamadı.</div>
-              )}
-            </div>
-          )}
         </div>
       </main>
     </div>

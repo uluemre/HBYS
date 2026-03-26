@@ -1,0 +1,17 @@
+import axios from "axios"
+
+const api = axios.create({
+    baseURL: "http://192.168.233.106:8081/api"
+})
+
+api.interceptors.request.use((config) => {
+    const token = localStorage.getItem("token")
+
+    if (token) {
+        config.headers.Authorization = `Bearer ${token}`
+    }
+
+    return config
+})
+
+export default api
