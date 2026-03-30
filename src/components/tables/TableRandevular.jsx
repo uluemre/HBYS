@@ -1,6 +1,14 @@
 import React from 'react';
 
-const TableRandevular = ({ veriler }) => (
+const IPTAL_EDILEBİLİR = ["ONAYLANDI"];
+
+const durumClass = (durum) => {
+    if (durum === "ONAYLANDI") return "status-active";
+    if (durum === "IPTAL") return "status-cancel";
+    return "status-pending";
+};
+
+const TableRandevular = ({ veriler, onIptal }) => (
     <div className="table-container">
         <div className="table-header">
             <h3>📅 Randevu Kayıtları</h3>
@@ -14,6 +22,7 @@ const TableRandevular = ({ veriler }) => (
                     <th>Tarih & Saat</th>
                     <th>Durum</th>
                     <th>Şikayet</th>
+                    {onIptal && <th>İşlem</th>}
                 </tr>
             </thead>
             <tbody>
@@ -30,21 +39,51 @@ const TableRandevular = ({ veriler }) => (
                                 </div>
                             </td>
                             <td>
-                                <span
-                                    className={`status-badge ${item.durum === 'Onaylandı' || item.durum === 'ONAYLANDI'
-                                            ? 'status-active'
-                                            : 'status-pending'
-                                        }`}
-                                >
+                                <span className={`status-badge ${durumClass(item.durum)}`}>
                                     {item.durum}
                                 </span>
                             </td>
                             <td>{item.sikayet}</td>
+                            {onIptal && (
+                                <td>
+                                    {IPTAL_EDILEBİLİR.includes(item.durum) ? (
+                                        <button
+                                            onClick={() => onIptal(item.id)}
+                                            style={{
+                                                background: "transparent",
+                                                color: "#ef4444",
+                                                border: "1.5px solid #ef4444",
+                                                padding: "6px 14px",
+                                                borderRadius: 8,
+                                                fontWeight: 600,
+                                                cursor: "pointer",
+                                                fontSize: "0.82rem",
+                                                fontFamily: "Poppins, sans-serif",
+                                                transition: "0.2s",
+                                            }}
+                                            onMouseEnter={e => {
+                                                e.currentTarget.style.background = "#ef4444";
+                                                e.currentTarget.style.color = "white";
+                                            }}
+                                            onMouseLeave={e => {
+                                                e.currentTarget.style.background = "transparent";
+                                                e.currentTarget.style.color = "#ef4444";
+                                            }}
+                                        >
+                                            İptal Et
+                                        </button>
+                                    ) : (
+                                        <span style={{ color: "#94a3b8", fontSize: "0.82rem" }}>
+                                            {item.durum === "IPTAL" ? "İptal edildi" : "—"}
+                                        </span>
+                                    )}
+                                </td>
+                            )}
                         </tr>
                     ))
                 ) : (
                     <tr>
-                        <td colSpan="6" style={{ textAlign: 'center', padding: '20px', color: '#64748b' }}>
+                        <td colSpan={onIptal ? 7 : 6} style={{ textAlign: 'center', padding: '20px', color: '#64748b' }}>
                             Henüz aktif bir randevunuz bulunmamaktadır.
                         </td>
                     </tr>

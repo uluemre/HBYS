@@ -39,11 +39,8 @@ export default function HastaRandevuAkisi({
                 <div className="mhrs-action-grid">
                     <button
                         className="mhrs-main-action-card hospital"
-                        onClick={() => aramaTuruSec("ana_gecis")}
                         style={{ cursor: "pointer" }}
-                        // Ana sayfadaki "Randevu Al" butonu adım'ı "arama-turu"ya götürür
-                        onClick={() => { /* adım değiştirilecek */ }}
-                    >
+                        onClick={() => aramaTuruSec("poliklinik")}                    >
                         <div className="mhrs-main-action-icon">🏥</div>
                         <div>
                             <h3>Hastaneden Randevu Al</h3>

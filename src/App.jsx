@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";import "./App.css";
+import { useState, useMemo, useCallback } from "react"; import "./App.css";
 
 // ─── Hooks ────────────────────────────────────────────────────────────────────
 import { useAuth } from "./hooks/useAuth";
@@ -11,7 +11,7 @@ import { Login } from "./components/login/index.jsx";
 import { Sidebar } from "./components/sidebar";
 import ParkingLot from "./components/ParkingLot";
 import { PatientProfileInfo, DoctorProfileInfo } from "./components/profile/ProfileComponents";
-import { TableRandevular, TableTahliller, TableYatislar, TableSikayet, TablePersonel } from "./components/tables/index.js";
+import { TableRandevular, TableTahliller, TableYatislar, TableSikayet, TablePersonel, TableReceteler } from "./components/tables/index.js";
 import HastaRandevuAkisi from "./components/hasta/HastaRandevuAkisi";
 import MuayeneSurecleri from "./components/doktor/MuayeneSurecleri";
 import CalismaTakvimi from "./components/doktor/CalismaTakvimi";
@@ -106,7 +106,10 @@ export default function App() {
     () => muayene.buildHastaTahlilGorunumu(girisYapanKullanici),
     [girisYapanKullanici, muayene]
   );
-
+  const hastaReceteGorunumu = useMemo(
+    () => muayene.buildHastaReceteGorunumu(girisYapanKullanici),
+    [girisYapanKullanici, muayene]
+  );
   // 🔥 aynı mantık
   const doktorMuayeneSurecleri = useMemo(
     () => muayene.buildDoktoraMuayeneSurecleri(aktifDoktorDemoKaydi),
@@ -380,9 +383,13 @@ export default function App() {
           )}
 
           {/* ── Randevu / Tahlil ── */}
-          {aktifSekme === "Randevularım" && <TableRandevular veriler={goruntulenecekRandevular} />}
-          {aktifSekme === "Tahlillerim" && <TableTahliller veriler={hastaTahlilGorunumu} />}
-
+          {aktifSekme === "Randevularım" && (
+            <TableRandevular
+              veriler={goruntulenecekRandevular}
+              onIptal={rol === "HASTA" ? randevu.randevuIptal : undefined}
+            />
+          )}          {aktifSekme === "Tahlillerim" && <TableTahliller veriler={hastaTahlilGorunumu} />}
+          {aktifSekme === "Reçetelerim" && <TableReceteler veriler={hastaReceteGorunumu} />}
           {/* ── Doktor panelleri ── */}
           {aktifSekme === "Muayene Süreçleri" && rol === "DOKTOR" && (
             <MuayeneSurecleri
@@ -395,6 +402,7 @@ export default function App() {
               sonucuIncele={muayene.sonucuIncele}
               receteYaz={muayene.receteYaz}
               muayeneTamamla={muayene.muayeneTamamla}
+              buildHastaGecmisi={muayene.buildHastaGecmisi}
             />
           )}
           {aktifSekme === "Çalışma Takvimi" && rol === "DOKTOR" && (

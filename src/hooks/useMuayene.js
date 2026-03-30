@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { DOKTOR_LISTESI } from "../constants/doktorlar";
 import { TETKIK_SABLONLARI } from "../constants/hastaneler";
 import { formatTarih } from "../utils/helpers";
@@ -91,7 +91,7 @@ export function useMuayene(randevuListesi, setRandevuListesi) {
         );
     };
 
-    const tahlilIste = (randevu) => {
+    const tahlilIste = (randevu, seciliTahliller = []) => {
         const muayene = muayeneKayitlari.find(
             (m) => String(m.randevuId) === String(randevu.id)
         );
@@ -103,7 +103,12 @@ export function useMuayene(randevuListesi, setRandevuListesi) {
         if (mevcutTahliller.length > 0)
             return alert("Bu muayene için tahlil zaten istenmiş.");
 
-        const tetkikler = TETKIK_SABLONLARI[randevu.poliklinik] || ["Hemogram"];
+        // Eğer dışarıdan seçili tahlil gelmediyse poliklinik şablonunu kullan (geriye dönük uyumluluk)
+        const tetkikler =
+            seciliTahliller.length > 0
+                ? seciliTahliller
+                : TETKIK_SABLONLARI[randevu.poliklinik] || ["Hemogram (Tam Kan Sayımı)"];
+
         const yeniTahliller = tetkikler.map((tetkik, index) => ({
             id: `TAH-${Date.now()}-${index}`,
             muayeneId: muayene.id,
@@ -425,7 +430,78 @@ export function useMuayene(randevuListesi, setRandevuListesi) {
             .sort((a, b) => a.muayeneTarihi.localeCompare(b.muayeneTarihi))
             .reverse();
     };
+    const buildHastaReceteGorunumu = (girisYapanKullanici) => {
+        if (!girisYapanKullanici || girisYapanKullanici.rol !== "HASTA") return [];
+        const hastaId = Number(girisYapanKullanici.id);
 
+        return receteler
+            .filter((r) => Number(r.hastaId) === hastaId)
+            .map((recete) => {
+                const muayene = muayeneKayitlari.find(
+                    (m) => String(m.id) === String(recete.muayeneId)
+                );
+                const randevu = randevuListesi.find(
+                    (r) => String(r.id) === String(muayene?.randevuId)
+                );
+                const doktorKaydi = DOKTOR_LISTESI.find(
+                    (d) => Number(d.id) === Number(recete.doktorId)
+                );
+                return {
+                    id: recete.id,
+                    tarih: recete.receteTarihi ? formatTarih(recete.receteTarihi) : "—",
+                    poliklinik: randevu?.poliklinik || muayene?.poliklinik || "—",
+                    doktor: doktorKaydi?.ad || randevu?.doktor || "—",
+                    doktorNotu: recete.doktorNotu || "",
+                    ilaclar: recete.ilaclar || [],
+                };
+            })
+            .sort((a, b) => b.tarih.localeCompare(a.tarih));
+    };
+    const buildHastaGecmisi = (hastaId, doktorId) => {
+        if (!hastaId || !doktorId) return [];
+
+        return randevuListesi
+            .filter(
+                (r) =>
+                    Number(r.hastaId) === Number(hastaId) &&
+                    Number(r.doktorId) === Number(doktorId) &&
+                    r.durum === "TAMAMLANDI"
+            )
+            .map((randevu) => {
+                const muayene = muayeneKayitlari.find(
+                    (m) => String(m.randevuId) === String(randevu.id)
+                );
+                return {
+                    randevuId: randevu.id,
+                    tarih: randevu.tarih,
+                    saat: randevu.saat,
+                    poliklinik: randevu.poliklinik,
+                    sikayet: randevu.sikayet,
+                    onTani: muayene?.onTani || "—",
+                    doktorNotu: muayene?.doktorNotu || "—",
+                    tahliller: muayene
+                        ? tahlilIstekleri.filter(
+                            (t) => String(t.muayeneId) === String(muayene.id)
+                        )
+                        : [],
+                    sonuclar: muayene
+                        ? tahlilSonuclari.filter(
+                            (s) => String(s.muayeneId) === String(muayene.id)
+                        )
+                        : [],
+                    recete: muayene
+                        ? receteler.find(
+                            (r) => String(r.muayeneId) === String(muayene.id)
+                        )
+                        : null,
+                };
+            })
+            .sort(
+                (a, b) =>
+                    new Date(`${b.tarih}T${b.saat}`) -
+                    new Date(`${a.tarih}T${a.saat}`)
+            );
+    };
     return {
         muayeneKayitlari,
         tahlilIstekleri,
@@ -443,5 +519,7 @@ export function useMuayene(randevuListesi, setRandevuListesi) {
         // builder'lar (useMemo dışarıda yapılır)
         buildDoktoraMuayeneSurecleri,
         buildHastaTahlilGorunumu,
+        buildHastaReceteGorunumu,
+        buildHastaGecmisi,
     };
 }

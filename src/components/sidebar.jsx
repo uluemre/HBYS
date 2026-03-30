@@ -7,7 +7,7 @@ export const Sidebar = ({ rol, aktifSekme, setAktifSekme, logout }) => {
       { name: "Kişisel Bilgiler", icon: "👤" },
       { name: "Randevularım", icon: "📅" },
       { name: "Tahlillerim", icon: "🧪" },
-      { name: "Personel", icon: "👥" },
+      { name: "Reçetelerim", icon: "💊" },
       { name: "Otopark Durumu", icon: "🅿️" },
       { name: "Şikayet/Öneri", icon: "📩" }
     ],

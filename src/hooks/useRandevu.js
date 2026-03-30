@@ -428,7 +428,43 @@ export function useRandevu(girisYapanKullanici, setAktifSekme) {
             alert("Sunucu bağlantı hatası!");
         }
     };
+    const randevuIptal = (randevuId) => {
+        const randevu = randevuListesi.find(
+            (r) => String(r.id) === String(randevuId)
+        );
+        if (!randevu) return;
 
+        if (randevu.durum !== "ONAYLANDI") {
+            return alert("Sadece onaylanmış randevular iptal edilebilir.");
+        }
+
+        const onay = window.confirm(
+            `"${randevu.poliklinik} - ${randevu.doktor}" randevunuzu iptal etmek istediğinize emin misiniz?\n\nTarih: ${randevu.tarih} Saat: ${randevu.saat}`
+        );
+        if (!onay) return;
+
+        // Randevuyu iptal et
+        setRandevuListesi((prev) =>
+            prev.map((r) =>
+                String(r.id) === String(randevuId)
+                    ? { ...r, durum: "IPTAL" }
+                    : r
+            )
+        );
+
+        // Slotu tekrar müsaite çevir
+        setRandevuSlotlari((prev) =>
+            prev.map((s) =>
+                s.tarih === randevu.tarih &&
+                    String(s.doktorId) === String(randevu.doktorId) &&
+                    s.saat === randevu.saat
+                    ? { ...s, durum: "MUSAIT" }
+                    : s
+            )
+        );
+
+        alert("✅ Randevunuz başarıyla iptal edildi.");
+    };
     return {
         // state
         randevuAdimi,
@@ -466,5 +502,6 @@ export function useRandevu(girisYapanKullanici, setAktifSekme) {
         slotSec,
         konumuTespitEt,
         randevuAl,
+        randevuIptal,
     };
 }
