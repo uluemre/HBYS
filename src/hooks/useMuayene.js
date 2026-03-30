@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { DOKTOR_LISTESI } from "../constants/doktorlar";
 import { TETKIK_SABLONLARI } from "../constants/hastaneler";
 import { formatTarih } from "../utils/helpers";
+import { tahlilSonucuUret } from "../constants/tahlilReferanslari";
 
 export function useMuayene(randevuListesi, setRandevuListesi) {
     const bugunString = new Date().toISOString().split("T")[0];
@@ -238,18 +239,22 @@ export function useMuayene(randevuListesi, setRandevuListesi) {
         const hedefTahliller = tahlilIstekleri.filter(
             (t) => String(t.muayeneId) === String(muayeneId)
         );
-        if (hedefTahliller.length === 0)
-            return alert("Bu muayene için tahlil bulunamadı.");
+        if (hedefTahliller.length === 0) return alert("Bu muayene için tahlil bulunamadı.");
 
         const yeniSonuclar = hedefTahliller
             .filter((t) => !tahlilSonuclari.some((s) => String(s.tahlilId) === String(t.id)))
-            .map((tahlil, index) => ({
-                id: `SON-${Date.now()}-${index}`,
-                tahlilId: tahlil.id,
-                muayeneId,
-                sonucTarihi: bugunString,
-                ...ornekSonucUret(tahlil.tahlilTuru),
-            }));
+            .map((tahlil, index) => {
+                const { sonucDetaylari, genelDurum, anormalSayisi } = tahlilSonucuUret(tahlil.tahlilTuru);
+                return {
+                    id: `SON-${Date.now()}-${index}`,
+                    tahlilId: tahlil.id,
+                    muayeneId,
+                    sonucTarihi: bugunString,
+                    sonucOzeti: `${tahlil.tahlilTuru} sonuçlandı. Genel durum: ${genelDurum}. ${anormalSayisi > 0 ? `${anormalSayisi} parametre referans dışı.` : "Tüm değerler normal."}`,
+                    genelDurum,
+                    sonucDetaylari,
+                };
+            });
 
         if (yeniSonuclar.length === 0) return alert("Sonuçlar zaten oluşturulmuş.");
 
@@ -291,21 +296,11 @@ export function useMuayene(randevuListesi, setRandevuListesi) {
         );
     };
 
-    const receteYaz = (muayeneId, poliklinik) => {
+    const receteYaz = (muayeneId, recetePaketi) => {
         const mevcutRecete = receteler.find(
             (r) => String(r.muayeneId) === String(muayeneId)
         );
         if (mevcutRecete) return alert("Bu muayene için reçete zaten yazılmış.");
-
-        const ilaclar =
-            poliklinik === "Dahiliye (İç Hastalıkları)"
-                ? [
-                    { ilacAdi: "Demir İlacı", kullanim: "Günde 1 kez tok karnına", sure: "30 gün" },
-                    { ilacAdi: "B12 Vitamini", kullanim: "Günde 1 kez", sure: "14 gün" },
-                ]
-                : poliklinik === "Kardiyoloji"
-                    ? [{ ilacAdi: "Kalp Destek İlacı", kullanim: "Sabah 1 tablet", sure: "30 gün" }]
-                    : [{ ilacAdi: "Genel Destek İlacı", kullanim: "Günde 1 kez", sure: "7 gün" }];
 
         const muayene = muayeneKayitlari.find(
             (m) => String(m.id) === String(muayeneId)
@@ -319,8 +314,9 @@ export function useMuayene(randevuListesi, setRandevuListesi) {
                 hastaId: muayene.hastaId,
                 doktorId: muayene.doktorId,
                 receteTarihi: bugunString,
-                ilaclar,
-                doktorNotu: "Tahlil sonucu sonrası reçete oluşturuldu.",
+                ilaclar: recetePaketi.ilaclar,
+                doktorNotu: recetePaketi.doktorNotu || "",
+                tanilar: recetePaketi.tanilar || "",
             },
             ...prev,
         ]);

@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { formatTarih } from "../../utils/helpers";
 import HastaGecmisiModal from "./HastaGecmisiModal";
-
+import ReceteFormModal from "./ReceteFormModal";
 // ─── Tahlil kataloğu ──────────────────────────────────────────────────────────
 const TAHLIL_KATALOGU = {
     "Kan Tahlilleri": [
@@ -446,7 +446,7 @@ export default function MuayeneSurecleri({
 }) {
     const [modalAcikRandevuId, setModalAcikRandevuId] = useState(null);
     const [gecmisModalHasta, setGecmisModalHasta] = useState(null);
-
+    const [receteModalItem, setReceteModalItem] = useState(null);
     const muayeneGecmisi = gecmisModalHasta
         ? buildHastaGecmisi(gecmisModalHasta.hastaId, gecmisModalHasta.doktorId)
         : [];
@@ -464,14 +464,31 @@ export default function MuayeneSurecleri({
                     (s) => String(s.id) === String(modalAcikRandevuId)
                 );
                 if (!hedefRandevu) return null;
+
                 return (
                     <TahlilSecimModal
                         onKapat={() => setModalAcikRandevuId(null)}
-                        onOnayla={(secili) => handleTahlilOnayla(hedefRandevu, secili)}
-
+                        onOnayla={(secili) =>
+                            handleTahlilOnayla(hedefRandevu, secili)
+                        }
                     />
                 );
             })()}
+
+            {/* ✅ REÇETE MODAL */}
+            {receteModalItem && (
+                <ReceteFormModal
+                    randevu={receteModalItem}
+                    tahlilSonuclari={receteModalItem.sonuclar}
+                    onKapat={() => setReceteModalItem(null)}
+                    onKaydet={(recetePaketi) => {
+                        receteYaz(receteModalItem.muayene.id, recetePaketi);
+                        setReceteModalItem(null);
+                    }}
+                />
+            )}
+
+            {/* ✅ GEÇMİŞ MODAL */}
             {gecmisModalHasta && (
                 <HastaGecmisiModal
                     hastaAdi={gecmisModalHasta.hastaAdi}
@@ -480,6 +497,7 @@ export default function MuayeneSurecleri({
                 />
             )}
 
+            {/* BURADAN SONRA ANA UI GELİR */}
             <div className="table-container">
                 <div className="table-header" style={{ marginBottom: 20 }}>
                     <h3>🩺 Muayene ve Tahlil Süreç Yönetimi</h3>
@@ -603,7 +621,10 @@ export default function MuayeneSurecleri({
                                                 <button className="process-btn secondary" onClick={() => sonucuIncele(muayene.id)}>
                                                     Sonucu İncele
                                                 </button>
-                                                <button className="process-btn success" onClick={() => receteYaz(muayene.id, item.poliklinik)}>
+                                                <button
+                                                    className="process-btn success"
+                                                    onClick={() => setReceteModalItem({ ...item })}
+                                                >
                                                     Reçete Yaz
                                                 </button>
                                                 <button className="process-btn complete" onClick={() => muayeneTamamla(item.id, muayene.id)}>
